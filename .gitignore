@@ -1,0 +1,5 @@
+./data/yelp-2013/
+saved_models/
+*.pyc
+.DS_Store
+*txt
