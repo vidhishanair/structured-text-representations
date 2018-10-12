@@ -24,7 +24,7 @@ def load_data(config):
     return len(train), train_batches, dev_batches, test_batches, embeddings, vocab
 
 
-def get_feed_dict(batch):
+def get_feed_dict(batch, device):
     batch_size = len(batch)
     doc_l_matrix = np.zeros([batch_size], np.int32)
     for i, instance in enumerate(batch):
@@ -54,21 +54,21 @@ def get_feed_dict(batch):
     #     if (batch_size * max_doc_l * max_sent_l * max_sent_l > 16 * 200000):
     #         return [batch_size * max_doc_l * max_sent_l * max_sent_l / (16 * 200000) + 1]
 
-    feed_dict = {'token_idxs': torch.LongTensor(token_idxs_matrix), 'sent_l': torch.LongTensor(sent_l_matrix),
-                 'mask_tokens': torch.LongTensor(mask_tokens_matrix), 'mask_sents': torch.LongTensor(mask_sents_matrix),
-                 'doc_l': torch.LongTensor(doc_l_matrix), 'gold_labels': torch.LongTensor(gold_matrix),
-                 'max_sent_l': torch.LongTensor(max_sent_l), 'max_doc_l': torch.LongTensor(max_doc_l),
-                 'mask_parser_1': torch.LongTensor(mask_parser_1), 'mask_parser_2': torch.LongTensor(mask_parser_2),
-                 'batch_l': torch.LongTensor(batch_size)}
-    # feed_dict = feed_dict
+    feed_dict = {'token_idxs': torch.LongTensor(token_idxs_matrix).to(device), 'sent_l': torch.LongTensor(sent_l_matrix).to(device),
+                 'mask_tokens': torch.LongTensor(mask_tokens_matrix).to(device), 'mask_sents': torch.LongTensor(mask_sents_matrix).to(device),
+                 'doc_l': torch.LongTensor(doc_l_matrix).to(device), 'gold_labels': torch.LongTensor(gold_matrix).to(device),
+                 'max_sent_l': torch.LongTensor(max_sent_l).to(device), 'max_doc_l': torch.LongTensor(max_doc_l).to(device),
+                 'mask_parser_1': torch.LongTensor(mask_parser_1).to(device), 'mask_parser_2': torch.LongTensor(mask_parser_2).to(device),
+                 'batch_l': torch.LongTensor(batch_size).to(device)}
+    feed_dict = feed_dict
     return feed_dict
 
 
-def evaluate(model, test_batches):
+def evaluate(model, test_batches, device):
     corr_count, all_count = 0, 0
     model.eval()
     for ct, batch in test_batches:
-        feed_dict = get_feed_dict(batch) # batch = [Instances], feed_dict = {inputs}
+        feed_dict = get_feed_dict(batch, device) # batch = [Instances], feed_dict = {inputs}
         output = model.forward(feed_dict)
         predictions = output.max(1)[1]
         corr_count += torch.sum(predictions == feed_dict['gold_labels']).item()
@@ -81,7 +81,7 @@ def evaluate(model, test_batches):
 #     loss = criterion(output, target)
 
 
-def run(config):
+def run(config, device):
     import random
 
     hash = random.getrandbits(32)
@@ -101,7 +101,7 @@ def run(config):
     # print(config.__flags)
     # logger.critical(str(config.__flags))
 
-    model = DocumentClassificationModel(config.n_embed, config.d_embed, config.dim_hidden, config.dim_hidden, 1, 1, pretrained=embedding_matrix, dropout=config.dropout)
+    model = DocumentClassificationModel(config.n_embed, config.d_embed, config.dim_hidden, config.dim_hidden, 1, 1, pretrained=embedding_matrix, dropout=config.dropout).to(device)
     criterion = nn.CrossEntropyLoss(ignore_index=0)
 
     num_batches_per_epoch = int(num_examples / config.batch_size)
@@ -110,14 +110,14 @@ def run(config):
 
     for ct, batch in tqdm.tqdm(train_batches, total=num_steps):
         model.train()
-        feed_dict = get_feed_dict(batch) # batch = [Instances], feed_dict = {inputs}
+        feed_dict = get_feed_dict(batch, device) # batch = [Instances], feed_dict = {inputs}
         output = model.forward(feed_dict)
         target = feed_dict['gold_labels']
         loss = criterion(output, target)
         total_loss += loss
         if(ct%config.log_period==0):
-            acc_test = evaluate(model, test_batches)
-            acc_dev = evaluate(model, dev_batches)
+            acc_test = evaluate(model, test_batches, device)
+            acc_dev = evaluate(model, dev_batches, device)
             print('Step: {} Loss: {}\n'.format(ct, loss))
             print('Test ACC: {}\n'.format(acc_test))
             print('Dev  ACC: {}\n'.format(acc_dev))
@@ -175,4 +175,4 @@ if torch.cuda.is_available():
 
 device = torch.device("cuda" if args.cuda else "cpu")
 
-run(args)
+run(args, device)
