@@ -17,7 +17,6 @@ class DocumentClassificationModel(nn.Module):
         self.sentence_encoder = BiLSTMEncoder(sent_hidden_size, token_emb_size, sent_num_layers)
         self.document_encoder = BiLSTMEncoder(doc_hidden_size, sent_hidden_size, doc_num_layers)
 
-        print(sent_hidden_size)
         self.linear_out = nn.Linear(sent_hidden_size, 5)
 
 

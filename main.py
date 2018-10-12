@@ -3,6 +3,7 @@ import numpy as np
 import pickle
 import logging
 import torch
+import gc
 import argparse
 from models.DocumentClassificationModel import DocumentClassificationModel
 import tqdm
@@ -109,26 +110,31 @@ def run(config, device):
     num_steps = config.epochs * num_batches_per_epoch
     total_loss = 0
 
-    for ct, batch in tqdm.tqdm(train_batches, total=num_steps):
-        model.train()
-        feed_dict = get_feed_dict(batch, device) # batch = [Instances], feed_dict = {inputs}
-        output = model.forward(feed_dict)
-        target = feed_dict['gold_labels']
-        loss = criterion(output, target)
-        total_loss += loss
-        if(ct%config.log_period==0):
-            acc_test = evaluate(model, test_batches, device)
-            acc_dev = evaluate(model, dev_batches, device)
-            print('Step: {} Loss: {}\n'.format(ct, loss))
-            print('Test ACC: {}\n'.format(acc_test))
-            print('Dev  ACC: {}\n'.format(acc_dev))
-            logger.debug('Step: {} Loss: {}\n'.format(ct, loss))
-            logger.debug('Test ACC: {}\n'.format(acc_test))
-            logger.debug('Dev  ACC: {}\n'.format(acc_dev))
-            logger.handlers[0].flush()
-            total_loss = 0
-        del feed_dict
-        # saver.save(sess, 'my_test_model',global_step=1000)
+    try:
+        for ct, batch in tqdm.tqdm(train_batches, total=num_steps):
+            model.train()
+            feed_dict = get_feed_dict(batch, device) # batch = [Instances], feed_dict = {inputs}
+            output = model.forward(feed_dict)
+            target = feed_dict['gold_labels']
+            loss = criterion(output, target)
+            total_loss += loss
+            if(ct%config.log_period==0):
+                acc_test = evaluate(model, test_batches, device)
+                acc_dev = evaluate(model, dev_batches, device)
+                print('Step: {} Loss: {}\n'.format(ct, loss))
+                print('Test ACC: {}\n'.format(acc_test))
+                print('Dev  ACC: {}\n'.format(acc_dev))
+                logger.debug('Step: {} Loss: {}\n'.format(ct, loss))
+                logger.debug('Test ACC: {}\n'.format(acc_test))
+                logger.debug('Dev  ACC: {}\n'.format(acc_dev))
+                logger.handlers[0].flush()
+                total_loss = 0
+            del feed_dict
+            # saver.save(sess, 'my_test_model',global_step=1000)
+    except:
+        for obj in gc.get_objects():
+        if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
+            print(type(obj), obj.size())
 
 parser = argparse.ArgumentParser(description='PyTorch Definition Generation Model')
 parser.add_argument('--cuda', action='store_true', default=False, help='use CUDA')
