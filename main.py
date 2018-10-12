@@ -73,6 +73,7 @@ def evaluate(model, test_batches, device):
         predictions = output.max(1)[1]
         corr_count += torch.sum(predictions == feed_dict['gold_labels']).item()
         all_count += len(batch)
+        del feed_dict
     acc_test = 1.0 * corr_count / all_count
     return  acc_test
 
@@ -126,6 +127,7 @@ def run(config, device):
             logger.debug('Dev  ACC: {}\n'.format(acc_dev))
             logger.handlers[0].flush()
             total_loss = 0
+        del feed_dict
         # saver.save(sess, 'my_test_model',global_step=1000)
 
 parser = argparse.ArgumentParser(description='PyTorch Definition Generation Model')
