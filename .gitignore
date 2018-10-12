@@ -3,3 +3,7 @@ saved_models/
 *.pyc
 .DS_Store
 *txt
+.idea/
+*.iml
+*.log
+logs/*
