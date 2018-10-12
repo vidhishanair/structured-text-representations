@@ -7,6 +7,7 @@ import gc
 import argparse
 from models.DocumentClassificationModel import DocumentClassificationModel
 import tqdm
+import torch.optim as optim
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -104,6 +105,7 @@ def run(config, device):
 
     model = DocumentClassificationModel(config.n_embed, config.d_embed, config.dim_hidden, config.dim_hidden, 1, 1, pretrained=embedding_matrix, dropout=config.dropout).to(device)
     criterion = nn.CrossEntropyLoss(ignore_index=0)
+    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=config.lr)
 
     num_batches_per_epoch = int(num_examples / config.batch_size)
     num_steps = config.epochs * num_batches_per_epoch
@@ -116,7 +118,14 @@ def run(config, device):
             output = model.forward(feed_dict)
             target = feed_dict['gold_labels']
             loss = criterion(output, target)
+
+            optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm(model.parameters(), config.clip)
+            optimizer.step()
+
             total_loss += loss.item()
+
             if(ct%config.log_period==0):
                 acc_test = evaluate(model, test_batches, device)
                 acc_dev = evaluate(model, dev_batches, device)
