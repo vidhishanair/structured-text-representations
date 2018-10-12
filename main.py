@@ -61,7 +61,6 @@ def get_feed_dict(batch, device):
                  'max_sent_l': torch.LongTensor(max_sent_l).to(device), 'max_doc_l': torch.LongTensor(max_doc_l).to(device),
                  'mask_parser_1': torch.LongTensor(mask_parser_1).to(device), 'mask_parser_2': torch.LongTensor(mask_parser_2).to(device),
                  'batch_l': torch.LongTensor(batch_size).to(device)}
-    feed_dict = feed_dict
     return feed_dict
 
 
@@ -117,7 +116,7 @@ def run(config, device):
             output = model.forward(feed_dict)
             target = feed_dict['gold_labels']
             loss = criterion(output, target)
-            total_loss += loss
+            total_loss += loss.item()
             if(ct%config.log_period==0):
                 acc_test = evaluate(model, test_batches, device)
                 acc_dev = evaluate(model, dev_batches, device)
@@ -133,8 +132,8 @@ def run(config, device):
             # saver.save(sess, 'my_test_model',global_step=1000)
     except:
         for obj in gc.get_objects():
-        if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
-            print(type(obj), obj.size())
+            if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
+                print(type(obj), obj.size())
 
 parser = argparse.ArgumentParser(description='PyTorch Definition Generation Model')
 parser.add_argument('--cuda', action='store_true', default=False, help='use CUDA')
