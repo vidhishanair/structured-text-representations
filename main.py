@@ -121,7 +121,7 @@ def run(config, device):
 
             optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm(model.parameters(), config.clip)
+            #torch.nn.utils.clip_grad_norm(model.parameters(), config.clip)
             optimizer.step()
 
             total_loss += loss.item()
@@ -129,10 +129,10 @@ def run(config, device):
             if(ct%config.log_period==0):
                 acc_test = evaluate(model, test_batches, device)
                 acc_dev = evaluate(model, dev_batches, device)
-                print('Step: {} Loss: {}\n'.format(ct, loss))
+                print('Step: {} Loss: {}\n'.format(ct, total_loss))
                 print('Test ACC: {}\n'.format(acc_test))
                 print('Dev  ACC: {}\n'.format(acc_dev))
-                logger.debug('Step: {} Loss: {}\n'.format(ct, loss))
+                logger.debug('Step: {} Loss: {}\n'.format(ct, total_loss))
                 logger.debug('Test ACC: {}\n'.format(acc_test))
                 logger.debug('Dev  ACC: {}\n'.format(acc_dev))
                 logger.handlers[0].flush()
