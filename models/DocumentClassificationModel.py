@@ -45,7 +45,8 @@ class DocumentClassificationModel(nn.Module):
         encoded_sentences = encoded_sentences.contiguous().view(input.size(0), input.size(1), input.size(2), encoded_sentences.size(2))
 
 
-        encoded_sentences = encoded_sentences.max(dim=2)[0]
-        encoded_sentences = encoded_sentences.max(dim=1)[0]
-        output = self.linear_out(encoded_sentences)
+        encoded_sentences = encoded_sentences.max(dim=2)[0] # Batch * sent * dim
+        encoded_documents, hidden = self.document_encoder.forward(encoded_sentences)
+        encoded_documents = encoded_documents.max(dim=1)[0]
+        output = self.linear_out(encoded_documents)
         return output
