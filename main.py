@@ -103,7 +103,7 @@ def run(config, device):
     # print(config.__flags)
     # logger.critical(str(config.__flags))
 
-    model = DocumentClassificationModel(config.n_embed, config.d_embed, config.dim_hidden, config.dim_hidden, 1, 1, pretrained=embedding_matrix, dropout=config.dropout).to(device)
+    model = DocumentClassificationModel(config.n_embed, config.d_embed, config.dim_hidden, config.dim_hidden, 1, 1, config.dim_sem, pretrained=embedding_matrix, dropout=config.dropout).to(device)
     criterion = nn.CrossEntropyLoss(ignore_index=0)
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=config.lr)
 
