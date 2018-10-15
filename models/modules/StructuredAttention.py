@@ -88,6 +88,6 @@ class StructuredAttention(nn.Module):
         return output
 
     def b_inv(self, b_mat):
-        eye = b_mat.new_ones(b_mat.size(-1)).diag().expand_as(b_mat)
+        eye = b_mat.new_ones(b_mat.size(-1)).diag().expand_as(b_mat).to(self.device)
         b_inv, _ = torch.gesv(eye, b_mat)
         return b_inv
