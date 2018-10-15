@@ -5,8 +5,9 @@ import torch.nn.functional as F
 
 
 class StructuredAttention(nn.Module):
-    def __init__(self, sem_dim_size, sent_hiddent_size):
+    def __init__(self, device, sem_dim_size, sent_hiddent_size):
         super(StructuredAttention, self).__init__()
+        self.device = device
         self.sem_dim_size = sem_dim_size
         self.str_dim_size = sent_hiddent_size - self.sem_dim_size
         self.tp_linear = nn.Linear(self.str_dim_size, self.str_dim_size, bias=True)
@@ -36,7 +37,7 @@ class StructuredAttention(nn.Module):
         f_i = torch.exp(self.fi_linear(str_v)).squeeze()  # b*s, token
 
         mask = torch.ones(f_ij.size(1), f_ij.size(1)) - torch.eye(f_ij.size(1), f_ij.size(1))
-        mask = mask.unsqueeze(0).expand(f_ij.size(0), mask.size(0), mask.size(1))
+        mask = mask.unsqueeze(0).expand(f_ij.size(0), mask.size(0), mask.size(1)).to(self.device)
         A_ij = torch.exp(f_ij)*mask
 
         tmp = torch.sum(A_ij, dim=2)
@@ -64,8 +65,8 @@ class StructuredAttention(nn.Module):
         temp12 = torch.ones(batch_size, token_size, token_size-1)
         temp22 = torch.ones(batch_size, token_size-1, token_size)
 
-        mask1 = torch.cat([temp11,temp12],2)
-        mask2 = torch.cat([temp21,temp22],1)
+        mask1 = torch.cat([temp11,temp12],2).to(self.device)
+        mask2 = torch.cat([temp21,temp22],1).to(self.device)
 
         dx = mask1 * tmp1 - mask2 * tmp2
 

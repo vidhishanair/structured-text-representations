@@ -7,8 +7,9 @@ from models.modules.StructuredAttention import StructuredAttention
 
 
 class DocumentClassificationModel(nn.Module):
-    def __init__(self, vocab_size, token_emb_size, sent_hidden_size, doc_hidden_size, sent_num_layers, doc_num_layers, sem_dim_size, pretrained=None, dropout=0.5):
+    def __init__(self, device, vocab_size, token_emb_size, sent_hidden_size, doc_hidden_size, sent_num_layers, doc_num_layers, sem_dim_size, pretrained=None, dropout=0.5):
         super(DocumentClassificationModel, self).__init__()
+        self.device = device
         self.word_lookup = nn.Embedding(vocab_size, token_emb_size)
         self.drop = nn.Dropout(dropout)
         self.emb_drop = nn.Dropout(dropout)
@@ -17,8 +18,8 @@ class DocumentClassificationModel(nn.Module):
         self.sentence_encoder = BiLSTMEncoder(sent_hidden_size, token_emb_size, sent_num_layers)
         self.document_encoder = BiLSTMEncoder(doc_hidden_size, sem_dim_size, doc_num_layers)
 
-        self.sentence_structure_att = StructuredAttention(sem_dim_size, sent_hidden_size)
-        self.document_structure_att = StructuredAttention(sem_dim_size, doc_hidden_size)
+        self.sentence_structure_att = StructuredAttention(device, sem_dim_size, sent_hidden_size)
+        self.document_structure_att = StructuredAttention(device, sem_dim_size, doc_hidden_size)
 
         self.linear_out = nn.Linear(sem_dim_size, 5)
 
