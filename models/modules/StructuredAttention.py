@@ -18,8 +18,6 @@ class StructuredAttention(nn.Module):
         self.exparam = nn.Parameter(torch.Tensor(1,1,self.sem_dim_size))
         self.fzlinear = nn.Linear(2*self.sem_dim_size, self.sem_dim_size)
 
-        pass
-
     def forward(self, input): #batch * sent * token * hidden
         #reshaped_input = input.contiguous().view(input.size(0)*input.size(1), input.size(2). input.size(3))
         batch_size = input.size(0)
@@ -40,11 +38,15 @@ class StructuredAttention(nn.Module):
         mask = mask.unsqueeze(0).expand(f_ij.size(0), mask.size(0), mask.size(1)).to(self.device)
         A_ij = torch.exp(f_ij)*mask
 
+        del mask
+
         tmp = torch.sum(A_ij, dim=2)
         res = torch.zeros(f_ij.size(0), tmp.size(1), tmp.size(1)).to(self.device)
         #tmp = torch.stack([torch.diag(t) for t in tmp])
         res.as_strided(tmp.size(), [res.stride(0), res.size(2) + 1]).copy_(tmp)
         L_ij = -A_ij + res
+
+        del res
 
         L_ij_bar = L_ij
         L_ij_bar[:,0,:] = f_i
@@ -70,6 +72,8 @@ class StructuredAttention(nn.Module):
 
         dx = mask1 * tmp1 - mask2 * tmp2
 
+        del mask1, mask2
+
         d = torch.cat([d0.unsqueeze(1), dx], dim = 1)
         df = d.transpose(1,2)
 
@@ -82,12 +86,3 @@ class StructuredAttention(nn.Module):
         output = F.relu(self.fzlinear(finp))
 
         return output
-
-
-
-
-
-
-
-
-        pass
