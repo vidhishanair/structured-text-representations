@@ -52,7 +52,8 @@ class StructuredAttention(nn.Module):
         L_ij_bar[:,0,:] = f_i
 
         #No batch inverse
-        LLinv = torch.stack([torch.inverse(li) for li in L_ij_bar])
+        #LLinv = torch.stack([torch.inverse(li) for li in L_ij_bar])
+        LLinv = self.b_inv(L_ij_bar)
 
         d0 = f_i * LLinv[:,:,0]
 
@@ -86,3 +87,8 @@ class StructuredAttention(nn.Module):
         output = F.relu(self.fzlinear(finp))
 
         return output
+
+    def b_inv(self, b_mat):
+        eye = b_mat.new_ones(b_mat.size(-1)).diag().expand_as(b_mat)
+        b_inv, _ = torch.gesv(eye, b_mat)
+        return b_inv
