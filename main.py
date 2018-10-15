@@ -56,7 +56,7 @@ def get_feed_dict(batch, device):
     #     if (batch_size * max_doc_l * max_sent_l * max_sent_l > 16 * 200000):
     #         return [batch_size * max_doc_l * max_sent_l * max_sent_l / (16 * 200000) + 1]
 
-    feed_dict = {'token_idxs': torch.LongTensor(token_idxs_matrix).to(device)}
+    feed_dict = {'token_idxs': torch.LongTensor(token_idxs_matrix).to(device), 'gold_labels': torch.LongTensor(gold_matrix).to(device)}
 
     # , 'sent_l': torch.LongTensor(sent_l_matrix).to(device),
     #              'mask_tokens': torch.LongTensor(mask_tokens_matrix).to(device), 'mask_sents': torch.LongTensor(mask_sents_matrix).to(device),
@@ -70,12 +70,15 @@ def get_feed_dict(batch, device):
 def evaluate(model, test_batches, device):
     corr_count, all_count = 0, 0
     model.eval()
+    count = 0
     for ct, batch in test_batches:
+        print("Batch : "+str(count))
         feed_dict = get_feed_dict(batch, device) # batch = [Instances], feed_dict = {inputs}
         output = model.forward(feed_dict)
         predictions = output.max(1)[1]
         corr_count += torch.sum(predictions == feed_dict['gold_labels']).item()
         all_count += len(batch)
+        count += 1
         del feed_dict
     acc_test = 1.0 * corr_count / all_count
     return acc_test
@@ -144,7 +147,7 @@ def run(config, device):
     except:
         for obj in gc.get_objects():
             if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
-                print(type(obj), obj.size())
+                print("GC: "+str(type(obj))+" "+str(obj.size()))
 
 parser = argparse.ArgumentParser(description='PyTorch Definition Generation Model')
 parser.add_argument('--cuda', action='store_true', default=False, help='use CUDA')
@@ -156,7 +159,7 @@ parser.add_argument('--save_path', type=str, default='./saved_models/english_see
 parser.add_argument('--word_emsize', type=int, default=300,help='size of word embeddings')
 
 parser.add_argument('--dim_str', type=int, default=75,help='size of word embeddings')
-parser.add_argument('--dim_sem', type=int, default=125,help='size of word embeddings')
+parser.add_argument('--dim_sem', type=int, default=75,help='size of word embeddings')
 parser.add_argument('--dim_output', type=int, default=4,help='size of word embeddings')
 parser.add_argument('--n_embed', type=int, default=5000,help='size of word embeddings')
 parser.add_argument('--d_embed', type=int, default=5000,help='size of word embeddings')

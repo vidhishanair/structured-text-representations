@@ -56,5 +56,5 @@ class DocumentClassificationModel(nn.Module):
         encoded_documents = structured_encoded_documents.max(dim=1)[0]
         output = self.linear_out(encoded_documents)
 
-        del input['token_idxs']
+        #del input['token_idxs']
         return output
