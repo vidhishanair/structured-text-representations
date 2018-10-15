@@ -41,7 +41,7 @@ class StructuredAttention(nn.Module):
         A_ij = torch.exp(f_ij)*mask
 
         tmp = torch.sum(A_ij, dim=2)
-        res = torch.zeros(f_ij.size(0), tmp.size(1), tmp.size(1))
+        res = torch.zeros(f_ij.size(0), tmp.size(1), tmp.size(1)).to(self.device)
         #tmp = torch.stack([torch.diag(t) for t in tmp])
         res.as_strided(tmp.size(), [res.stride(0), res.size(2) + 1]).copy_(tmp)
         L_ij = -A_ij + res
