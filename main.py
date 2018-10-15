@@ -56,12 +56,14 @@ def get_feed_dict(batch, device):
     #     if (batch_size * max_doc_l * max_sent_l * max_sent_l > 16 * 200000):
     #         return [batch_size * max_doc_l * max_sent_l * max_sent_l / (16 * 200000) + 1]
 
-    feed_dict = {'token_idxs': torch.LongTensor(token_idxs_matrix).to(device), 'sent_l': torch.LongTensor(sent_l_matrix).to(device),
-                 'mask_tokens': torch.LongTensor(mask_tokens_matrix).to(device), 'mask_sents': torch.LongTensor(mask_sents_matrix).to(device),
-                 'doc_l': torch.LongTensor(doc_l_matrix).to(device), 'gold_labels': torch.LongTensor(gold_matrix).to(device),
-                 'max_sent_l': torch.LongTensor(max_sent_l).to(device), 'max_doc_l': torch.LongTensor(max_doc_l).to(device),
-                 'mask_parser_1': torch.LongTensor(mask_parser_1).to(device), 'mask_parser_2': torch.LongTensor(mask_parser_2).to(device),
-                 'batch_l': torch.LongTensor(batch_size).to(device)}
+    feed_dict = {'token_idxs': torch.LongTensor(token_idxs_matrix).to(device)}
+
+    # , 'sent_l': torch.LongTensor(sent_l_matrix).to(device),
+    #              'mask_tokens': torch.LongTensor(mask_tokens_matrix).to(device), 'mask_sents': torch.LongTensor(mask_sents_matrix).to(device),
+    #              'doc_l': torch.LongTensor(doc_l_matrix).to(device), 'gold_labels': torch.LongTensor(gold_matrix).to(device),
+    #              'max_sent_l': torch.LongTensor(max_sent_l).to(device), 'max_doc_l': torch.LongTensor(max_doc_l).to(device),
+    #              'mask_parser_1': torch.LongTensor(mask_parser_1).to(device), 'mask_parser_2': torch.LongTensor(mask_parser_2).to(device),
+    #              'batch_l': torch.LongTensor(batch_size).to(device)}
     return feed_dict
 
 
@@ -76,7 +78,7 @@ def evaluate(model, test_batches, device):
         all_count += len(batch)
         del feed_dict
     acc_test = 1.0 * corr_count / all_count
-    return  acc_test
+    return acc_test
 
 
 # def get_loss(output, target, criterion):

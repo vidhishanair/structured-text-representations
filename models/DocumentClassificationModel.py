@@ -31,8 +31,8 @@ class DocumentClassificationModel(nn.Module):
         :return: batch*document_size*sent_size*hidden_dim
         """
         sent = input['token_idxs']
-        sent_l = input['sent_l']
-        sent_mask = input['mask_tokens']
+        # sent_l = input['sent_l']
+        # sent_mask = input['mask_tokens']
         input = self.word_lookup(sent)
         input = self.emb_drop(input)
         reshaped_input = input.contiguous().view(input.size(0)*input.size(1), input.size(2), input.size(3))
@@ -50,10 +50,11 @@ class DocumentClassificationModel(nn.Module):
         """
         encoded_sentences = structured_encoded_sentences.contiguous().view(input.size(0), input.size(1), input.size(2), structured_encoded_sentences.size(2))
 
-
         encoded_sentences = encoded_sentences.max(dim=2)[0] # Batch * sent * dim
         encoded_documents, hidden = self.document_encoder.forward(encoded_sentences)
         structured_encoded_documents = self.document_structure_att.forward(encoded_documents)
         encoded_documents = structured_encoded_documents.max(dim=1)[0]
         output = self.linear_out(encoded_documents)
+
+        del input['token_idxs']
         return output
