@@ -1,0 +1,4 @@
+torch
+tqdm
+gensim
+cython
