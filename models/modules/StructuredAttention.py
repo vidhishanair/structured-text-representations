@@ -51,13 +51,12 @@ class StructuredAttention(nn.Module):
         L_ij_bar = L_ij
         L_ij_bar[:,0,:] = f_i
 
+        #No batch inverse
         LLinv = torch.stack([torch.inverse(li) for li in L_ij_bar])
 
         d0 = f_i * LLinv[:,:,0]
 
-        #Batch Diagonalization not available in pytorch #change to torch.diagonal
-        #LLinv_diag = torch.stack([torch.diag(lid) for lid in LLinv]).unsqueeze(2)
-        LLinv_diag = torch.diagonal(LLinv, dim1=-2, dim2=-1)
+        LLinv_diag = torch.diagonal(LLinv, dim1=-2, dim2=-1).unsqueeze(2)
 
         tmp1 = (LLinv_diag * A_ij.transpose(1,2)).transpose(1,2)
         tmp2 = A_ij * LLinv_diag.transpose(1,2)

@@ -51,6 +51,8 @@ def get_feed_dict(batch, device):
     mask_parser_2 = np.ones([batch_size, max_doc_l, max_doc_l], np.float32)
     mask_parser_1[:, :, 0] = 0
     mask_parser_2[:, 0, :] = 0
+    if (batch_size * max_doc_l * max_sent_l * max_sent_l > 16 * 200000):
+        return False, [batch_size * max_doc_l * max_sent_l * max_sent_l / (16 * 200000) + 1]
 
     # if (self.config.large_data):
     #     if (batch_size * max_doc_l * max_sent_l * max_sent_l > 16 * 200000):
@@ -64,7 +66,7 @@ def get_feed_dict(batch, device):
     #              'max_sent_l': torch.LongTensor(max_sent_l).to(device), 'max_doc_l': torch.LongTensor(max_doc_l).to(device),
     #              'mask_parser_1': torch.LongTensor(mask_parser_1).to(device), 'mask_parser_2': torch.LongTensor(mask_parser_2).to(device),
     #              'batch_l': torch.LongTensor(batch_size).to(device)}
-    return feed_dict
+    return True, feed_dict
 
 
 def evaluate(model, test_batches, device):
@@ -73,7 +75,9 @@ def evaluate(model, test_batches, device):
     count = 0
     for ct, batch in test_batches:
         print("Batch : "+str(count))
-        feed_dict = get_feed_dict(batch, device) # batch = [Instances], feed_dict = {inputs}
+        value, feed_dict = get_feed_dict(batch, device) # batch = [Instances], feed_dict = {inputs}
+        if not value:
+            continue
         output = model.forward(feed_dict)
         predictions = output.max(1)[1]
         corr_count += torch.sum(predictions == feed_dict['gold_labels']).item()
@@ -119,7 +123,9 @@ def run(config, device):
     try:
         for ct, batch in tqdm.tqdm(train_batches, total=num_steps):
             model.train()
-            feed_dict = get_feed_dict(batch, device) # batch = [Instances], feed_dict = {inputs}
+            value, feed_dict = get_feed_dict(batch, device) # batch = [Instances], feed_dict = {inputs}
+            if not value:
+                continue
             output = model.forward(feed_dict)
             target = feed_dict['gold_labels']
             loss = criterion(output, target)
