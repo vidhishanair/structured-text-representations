@@ -51,7 +51,7 @@ def get_feed_dict(batch, device):
     mask_parser_2 = np.ones([batch_size, max_doc_l, max_doc_l], np.float32)
     mask_parser_1[:, :, 0] = 0
     mask_parser_2[:, 0, :] = 0
-    if (batch_size * max_doc_l * max_sent_l * max_sent_l > 12 * 200000):
+    if (batch_size * max_doc_l * max_sent_l * max_sent_l > 12 * 80000):
         return False, [batch_size * max_doc_l * max_sent_l * max_sent_l / (12 * 200000) + 1]
 
     # if (self.config.large_data):
@@ -118,7 +118,7 @@ def run(config, device):
 
     model = DocumentClassificationModel(device, config.n_embed, config.d_embed, config.dim_hidden, config.dim_hidden, 1, 1, config.dim_sem, pretrained=embedding_matrix, dropout=config.dropout).to(device)
     criterion = nn.CrossEntropyLoss(ignore_index=0)
-    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=config.lr)
+    optimizer = optim.Adagrad(filter(lambda p: p.requires_grad, model.parameters()), lr=config.lr)
 
     
     #for obj in gc.get_objects():
@@ -129,6 +129,7 @@ def run(config, device):
     total_loss = 0
 
     # try:
+    count = 0
     for ct, batch in tqdm.tqdm(train_batches, total=num_steps):
         model.train()
         value, feed_dict = get_feed_dict(batch, device) # batch = [Instances], feed_dict = {inputs}
