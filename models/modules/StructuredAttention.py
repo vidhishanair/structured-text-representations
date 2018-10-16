@@ -9,8 +9,9 @@ class StructuredAttention(nn.Module):
         super(StructuredAttention, self).__init__()
         self.device = device
         self.sem_dim_size = sem_dim_size
-        self.self.rep_dim = sem_dim_size
+        self.att_dim = sem_dim_size
         self.str_dim_size = sent_hiddent_size - self.sem_dim_size
+        self.rep_dim = sem_dim_size
         self.tp_linear = nn.Linear(self.str_dim_size, self.str_dim_size, bias=True)
         self.tc_linear = nn.Linear(self.str_dim_size, self.str_dim_size, bias=True)
         self.fi_linear = nn.Linear(self.str_dim_size, 1, bias=True)
@@ -27,7 +28,7 @@ class StructuredAttention(nn.Module):
         sem_v = input[:,:,:self.sem_dim_size]
         str_v = input[:,:,self.sem_dim_size:]
         tp = self.tp_linear(str_v) # b*s, token, h1
-        tc = self.tp_linear(str_v) # b*s, token, h1
+        tc = self.tc_linear(str_v) # b*s, token, h1
 
         tp = tp.unsqueeze(2).expand(tp.size(0), tp.size(1), tp.size(1), tp.size(2)).contiguous()
         tc = tc.unsqueeze(2).expand(tc.size(0), tc.size(1), tc.size(1), tc.size(2)).contiguous()
@@ -92,22 +93,22 @@ class StructuredAttention(nn.Module):
     def aditya_code(self, input_var):
         batch_size, num_words, inp_dim = input_var.size()
 
-        assert inp_dim == self.input_dim, "Dimensions Mismatch Expected %s, Got %s" % (self.input_dim, inp_dim)
+        # assert inp_dim == self.input_dim, "Dimensions Mismatch Expected %s, Got %s" % (self.input_dim, inp_dim)
 
         inpe = input_var[:,:,:self.rep_dim]
         inpd = input_var[:,:,self.rep_dim:]
 
-        tp = F.tanh(self.wplinear(inpd))
-        tc = F.tanh(self.wclinear(inpd))
+        tp = F.tanh(self.tp_linear(inpd))
+        tc = F.tanh(self.tc_linear(inpd))
 
         tpr = tp.repeat(1,1,num_words).view(batch_size,num_words,num_words,self.att_dim) \
             .view(batch_size*num_words*num_words,self.att_dim)
         tcr = tc.repeat(1,num_words,1).view(batch_size,num_words,num_words,self.att_dim) \
             .view(batch_size*num_words*num_words,self.att_dim)
 
-        fij = self.wabilinear(tpr,tcr).view(batch_size, num_words, num_words)
+        fij = self.bilinear(tpr,tcr).view(batch_size, num_words, num_words)
 
-        fr = torch.exp(self.wrlinear(inpd).squeeze(2))
+        fr = torch.exp(self.fi_linear(inpd).squeeze(2))
 
         Aij = torch.exp(fij)
         maskij = 1.-torch.eye(num_words).unsqueeze(0).expand(batch_size, num_words, num_words).to(self.device)

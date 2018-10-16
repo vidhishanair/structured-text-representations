@@ -38,7 +38,7 @@ class DocumentClassificationModel(nn.Module):
         reshaped_input = input.contiguous().view(input.size(0)*input.size(1), input.size(2), input.size(3))
         encoded_sentences, hidden = self.sentence_encoder.forward(reshaped_input)
 
-        structured_encoded_sentences = self.sentence_structure_att.forward(encoded_sentences)
+        structured_encoded_sentences = self.sentence_structure_att.aditya_code(encoded_sentences)
         """
         TODO
         1. Structured Attention
