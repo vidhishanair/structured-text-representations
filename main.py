@@ -51,13 +51,14 @@ def get_feed_dict(batch, device):
     mask_parser_2 = np.ones([batch_size, max_doc_l, max_doc_l], np.float32)
     mask_parser_1[:, :, 0] = 0
     mask_parser_2[:, 0, :] = 0
-    if (batch_size * max_doc_l * max_sent_l * max_sent_l > 16 * 200000):
-        return False, [batch_size * max_doc_l * max_sent_l * max_sent_l / (16 * 200000) + 1]
+    if (batch_size * max_doc_l * max_sent_l * max_sent_l > 12 * 200000):
+        return False, [batch_size * max_doc_l * max_sent_l * max_sent_l / (12 * 200000) + 1]
 
     # if (self.config.large_data):
     #     if (batch_size * max_doc_l * max_sent_l * max_sent_l > 16 * 200000):
     #         return [batch_size * max_doc_l * max_sent_l * max_sent_l / (16 * 200000) + 1]
-
+    if max_doc_l == 1 or max_sent_l == 1:
+        return False, {}
     feed_dict = {'token_idxs': torch.LongTensor(token_idxs_matrix).to(device), 'gold_labels': torch.LongTensor(gold_matrix).to(device)}
 
     # , 'sent_l': torch.LongTensor(sent_l_matrix).to(device),
@@ -74,7 +75,7 @@ def evaluate(model, test_batches, device):
     model.eval()
     count = 0
     for ct, batch in test_batches:
-        print("Batch : "+str(count))
+        #print("Batch : "+str(count))
         value, feed_dict = get_feed_dict(batch, device) # batch = [Instances], feed_dict = {inputs}
         if not value:
             continue
@@ -83,6 +84,9 @@ def evaluate(model, test_batches, device):
         corr_count += torch.sum(predictions == feed_dict['gold_labels']).item()
         all_count += len(batch)
         count += 1
+        del feed_dict['token_idxs']
+        del feed_dict['gold_labels']
+        torch.cuda.empty_cache()
         del feed_dict
     acc_test = 1.0 * corr_count / all_count
     return acc_test
@@ -116,6 +120,10 @@ def run(config, device):
     criterion = nn.CrossEntropyLoss(ignore_index=0)
     optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=config.lr)
 
+    
+    #for obj in gc.get_objects():
+    #    if torch.is_tensor(obj):
+    #        print("GC1: "+str(type(obj))+" "+str(obj.size()))
     num_batches_per_epoch = int(num_examples / config.batch_size)
     num_steps = config.epochs * num_batches_per_epoch
     total_loss = 0
@@ -124,6 +132,9 @@ def run(config, device):
         for ct, batch in tqdm.tqdm(train_batches, total=num_steps):
             model.train()
             value, feed_dict = get_feed_dict(batch, device) # batch = [Instances], feed_dict = {inputs}
+            #for obj in gc.get_objects():
+            #    if torch.is_tensor(obj):
+            #        print("GC2: "+str(type(obj))+" "+str(obj.size()))
             if not value:
                 continue
             output = model.forward(feed_dict)
@@ -136,8 +147,7 @@ def run(config, device):
             optimizer.step()
 
             total_loss += loss.item()
-
-            if(ct%config.log_period==0):
+            if(ct!= 0 and ct%config.log_period==0):
                 acc_test = evaluate(model, test_batches, device)
                 acc_dev = evaluate(model, dev_batches, device)
                 print('Step: {} Loss: {}\n'.format(ct, total_loss))
@@ -148,11 +158,17 @@ def run(config, device):
                 logger.debug('Dev  ACC: {}\n'.format(acc_dev))
                 logger.handlers[0].flush()
                 total_loss = 0
-            del feed_dict
+            del feed_dict['token_idxs']
+            del feed_dict['gold_labels']
+            torch.cuda.empty_cache()
+            #for obj in gc.get_objects():
+            #    if torch.is_tensor(obj):
+            #        print("GC3: "+str(type(obj))+" "+str(obj.size()))
             # saver.save(sess, 'my_test_model',global_step=1000)
     except:
+        torch.cuda.empty_cache()
         for obj in gc.get_objects():
-            if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
+            if torch.is_tensor(obj):
                 print("GC: "+str(type(obj))+" "+str(obj.size()))
 
 parser = argparse.ArgumentParser(description='PyTorch Definition Generation Model')
@@ -164,8 +180,8 @@ parser.add_argument('--data_file', type=str, default='data/yelp-2013/yelp-2013-a
 parser.add_argument('--save_path', type=str, default='./saved_models/english_seed/',help='location of the best model and generated files to save')
 parser.add_argument('--word_emsize', type=int, default=300,help='size of word embeddings')
 
-parser.add_argument('--dim_str', type=int, default=75,help='size of word embeddings')
-parser.add_argument('--dim_sem', type=int, default=75,help='size of word embeddings')
+parser.add_argument('--dim_str', type=int, default=50,help='size of word embeddings')
+parser.add_argument('--dim_sem', type=int, default=50,help='size of word embeddings')
 parser.add_argument('--dim_output', type=int, default=4,help='size of word embeddings')
 parser.add_argument('--n_embed', type=int, default=5000,help='size of word embeddings')
 parser.add_argument('--d_embed', type=int, default=5000,help='size of word embeddings')

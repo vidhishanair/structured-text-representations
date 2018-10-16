@@ -27,8 +27,8 @@ class StructuredAttention(nn.Module):
 
         sem_v = input[:,:,:self.sem_dim_size]
         str_v = input[:,:,self.sem_dim_size:]
-        tp = self.tp_linear(str_v) # b*s, token, h1
-        tc = self.tc_linear(str_v) # b*s, token, h1
+        tp = F.tanh(self.tp_linear(str_v)) # b*s, token, h1
+        tc = F.tanh(self.tc_linear(str_v)) # b*s, token, h1
 
         tp = tp.unsqueeze(2).expand(tp.size(0), tp.size(1), tp.size(1), tp.size(2)).contiguous()
         tc = tc.unsqueeze(2).expand(tc.size(0), tc.size(1), tc.size(1), tc.size(2)).contiguous()
@@ -54,8 +54,8 @@ class StructuredAttention(nn.Module):
         L_ij_bar[:,0,:] = f_i
 
         #No batch inverse
-        #LLinv1 = torch.stack([torch.inverse(li) for li in L_ij_bar])
-        LLinv = b_inv(L_ij_bar).contiguous()
+        LLinv = torch.stack([torch.inverse(li) for li in L_ij_bar])
+        #LLinv = b_inv(L_ij_bar, self.device).contiguous()
         d0 = f_i * LLinv[:,:,0]
 
         LLinv_diag = torch.diagonal(LLinv, dim1=-2, dim2=-1).unsqueeze(2)
@@ -124,8 +124,8 @@ class StructuredAttention(nn.Module):
         LLxij = torch.cat([Lfr, LLij], dim = 1)
 
         #Batch Inverse not available in Pytorch
-        #LLinv = torch.stack([torch.inverse(li) for li in LLxij])
-        LLinv = b_inv(LLxij).contiguous()
+        LLinv = torch.stack([torch.inverse(li) for li in LLxij])
+        #LLinv = b_inv(LLxij, self.device).contiguous()
 
 
         d0 = fr * LLinv[:,:,0]
@@ -162,8 +162,10 @@ class StructuredAttention(nn.Module):
         return output
 
 def b_inv(b_mat, device):
-    eye = b_mat.new_ones(b_mat.size(-1)).diag().expand_as(b_mat).to(device)
+    #eye = b_mat.new_ones(b_mat.size(-1)).diag().expand_as(b_mat).to(device)
     # eye = torch.eye(b_mat.size(1), b_mat.size(2)).unsqueeze(0).expand(b_mat.size(0), b_mat.size(1), b_mat.size(2)).to(self.device)
+    eye = torch.rand(b_mat.size(0), b_mat.size(1), b_mat.size(2)).to(device)
+    #b_inv = torch.rand(b_mat.size(0), b_mat.size(1), b_mat.size(2)).to(device)
     b_inv, _ = torch.gesv(eye, b_mat)
     del eye
     return b_inv

@@ -11,10 +11,11 @@ class DocumentClassificationModel(nn.Module):
         super(DocumentClassificationModel, self).__init__()
         self.device = device
         self.word_lookup = nn.Embedding(vocab_size, token_emb_size)
-        self.drop = nn.Dropout(dropout)
-        self.emb_drop = nn.Dropout(dropout)
+        #self.drop = nn.Dropout(dropout)
+        #self.emb_drop = nn.Dropout(dropout)
         if pretrained is not None:
             self.word_lookup.weight.data.copy_(torch.from_numpy(pretrained))
+        del pretrained
         self.sentence_encoder = BiLSTMEncoder(sent_hidden_size, token_emb_size, sent_num_layers)
         self.document_encoder = BiLSTMEncoder(doc_hidden_size, sem_dim_size, doc_num_layers)
 
@@ -34,11 +35,11 @@ class DocumentClassificationModel(nn.Module):
         # sent_l = input['sent_l']
         # sent_mask = input['mask_tokens']
         input = self.word_lookup(sent)
-        input = self.emb_drop(input)
+        #input = self.emb_drop(input)
         reshaped_input = input.contiguous().view(input.size(0)*input.size(1), input.size(2), input.size(3))
         encoded_sentences, hidden = self.sentence_encoder.forward(reshaped_input)
 
-        structured_encoded_sentences = self.sentence_structure_att.aditya_code(encoded_sentences)
+        structured_encoded_sentences = self.sentence_structure_att.forward(encoded_sentences)
         """
         TODO
         1. Structured Attention
@@ -52,7 +53,7 @@ class DocumentClassificationModel(nn.Module):
 
         encoded_sentences = encoded_sentences.max(dim=2)[0] # Batch * sent * dim
         encoded_documents, hidden = self.document_encoder.forward(encoded_sentences)
-        structured_encoded_documents = self.document_structure_att.aditya_code(encoded_documents)
+        structured_encoded_documents = self.document_structure_att.forward(encoded_documents)
         encoded_documents = structured_encoded_documents.max(dim=1)[0]
         output = self.linear_out(encoded_documents)
 
