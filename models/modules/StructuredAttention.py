@@ -55,7 +55,7 @@ class StructuredAttention(nn.Module):
 
         #No batch inverse
         #LLinv1 = torch.stack([torch.inverse(li) for li in L_ij_bar])
-        LLinv = self.b_inv(L_ij_bar).contiguous()
+        LLinv = b_inv(L_ij_bar).contiguous()
         d0 = f_i * LLinv[:,:,0]
 
         LLinv_diag = torch.diagonal(LLinv, dim1=-2, dim2=-1).unsqueeze(2)
@@ -124,7 +124,9 @@ class StructuredAttention(nn.Module):
         LLxij = torch.cat([Lfr, LLij], dim = 1)
 
         #Batch Inverse not available in Pytorch
-        LLinv = torch.stack([torch.inverse(li) for li in LLxij])
+        #LLinv = torch.stack([torch.inverse(li) for li in LLxij])
+        LLinv = b_inv(LLxij).contiguous()
+
 
         d0 = fr * LLinv[:,:,0]
 
