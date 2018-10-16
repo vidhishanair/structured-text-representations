@@ -31,7 +31,7 @@ class DocumentClassificationModel(nn.Module):
         :param input: batch*document_size*sent_size
         :return: batch*document_size*sent_size*hidden_dim
         """
-        batch_size, sent_size, token_size = input.size()
+        batch_size, sent_size, token_size = input['token_idxs'].size()
         # sent_l = input['sent_l']
         # sent_mask = input['mask_tokens']
         input = self.word_lookup(input['token_idxs'])
@@ -46,7 +46,7 @@ class DocumentClassificationModel(nn.Module):
         encoded_sentences = self.sentence_structure_att.forward(encoded_sentences)
 
         #Reshape and max pool
-        encoded_sentences = encoded_sentences.contiguous().view(input.size(0), input.size(1), input.size(2), encoded_sentences.size(2))
+        encoded_sentences = encoded_sentences.contiguous().view(batch_size, sent_size, token_size, encoded_sentences.size(2))
         encoded_sentences = encoded_sentences.max(dim=2)[0] # Batch * sent * dim
 
         #Doc BiLSTM
