@@ -52,7 +52,7 @@ class DocumentClassificationModel(nn.Module):
 
         encoded_sentences = encoded_sentences.max(dim=2)[0] # Batch * sent * dim
         encoded_documents, hidden = self.document_encoder.forward(encoded_sentences)
-        structured_encoded_documents = self.document_structure_att.forward(encoded_documents)
+        structured_encoded_documents = self.document_structure_att.aditya_code(encoded_documents)
         encoded_documents = structured_encoded_documents.max(dim=1)[0]
         output = self.linear_out(encoded_documents)
 
