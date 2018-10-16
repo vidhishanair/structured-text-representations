@@ -31,31 +31,32 @@ class DocumentClassificationModel(nn.Module):
         :param input: batch*document_size*sent_size
         :return: batch*document_size*sent_size*hidden_dim
         """
-        sent = input['token_idxs']
+        batch_size, sent_size, token_size = input.size()
         # sent_l = input['sent_l']
         # sent_mask = input['mask_tokens']
-        input = self.word_lookup(sent)
+        input = self.word_lookup(input['token_idxs'])
         #input = self.emb_drop(input)
-        reshaped_input = input.contiguous().view(input.size(0)*input.size(1), input.size(2), input.size(3))
-        encoded_sentences, hidden = self.sentence_encoder.forward(reshaped_input)
+        #reshape to 3D tensor
+        input = input.contiguous().view(input.size(0)*input.size(1), input.size(2), input.size(3))
 
-        structured_encoded_sentences = self.sentence_structure_att.forward(encoded_sentences)
-        """
-        TODO
-        1. Structured Attention
-        2. Pooling
-        3. Document Encoder
-        4. Structured Attention
-        5. Pooling
-        6. Prediction
-        """
-        encoded_sentences = structured_encoded_sentences.contiguous().view(input.size(0), input.size(1), input.size(2), structured_encoded_sentences.size(2))
+        #BiLSTM
+        encoded_sentences, hidden = self.sentence_encoder.forward(input)
 
+        #Structure ATT
+        encoded_sentences = self.sentence_structure_att.forward(encoded_sentences)
+
+        #Reshape and max pool
+        encoded_sentences = encoded_sentences.contiguous().view(input.size(0), input.size(1), input.size(2), encoded_sentences.size(2))
         encoded_sentences = encoded_sentences.max(dim=2)[0] # Batch * sent * dim
+
+        #Doc BiLSTM
         encoded_documents, hidden = self.document_encoder.forward(encoded_sentences)
-        structured_encoded_documents = self.document_structure_att.forward(encoded_documents)
-        encoded_documents = structured_encoded_documents.max(dim=1)[0]
+        #structure Att
+        encoded_documents = self.document_structure_att.forward(encoded_documents)
+        #Max Pool
+        encoded_documents = encoded_documents.max(dim=1)[0]
+
+        #Linear for output
         output = self.linear_out(encoded_documents)
 
-        #del input['token_idxs']
         return output

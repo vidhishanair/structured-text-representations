@@ -21,15 +21,13 @@ class StructuredAttention(nn.Module):
         self.fzlinear = nn.Linear(2*self.sem_dim_size, self.sem_dim_size)
 
     def forward(self, input): #batch*sent * token * hidden
-        #reshaped_input = input.contiguous().view(input.size(0)*input.size(1), input.size(2). input.size(3))
-        batch_size = input.size(0)
-        token_size = input.size(1)
+        batch_size, token_size, dim_size = input.size()
 
         sem_v = input[:,:,:self.sem_dim_size]
         str_v = input[:,:,self.sem_dim_size:]
+
         tp = F.tanh(self.tp_linear(str_v)) # b*s, token, h1
         tc = F.tanh(self.tc_linear(str_v)) # b*s, token, h1
-
         tp = tp.unsqueeze(2).expand(tp.size(0), tp.size(1), tp.size(1), tp.size(2)).contiguous()
         tc = tc.unsqueeze(2).expand(tc.size(0), tc.size(1), tc.size(1), tc.size(2)).contiguous()
 
@@ -40,15 +38,15 @@ class StructuredAttention(nn.Module):
         mask = mask.unsqueeze(0).expand(f_ij.size(0), mask.size(0), mask.size(1)).to(self.device)
         A_ij = torch.exp(f_ij)*mask
 
-        del mask
+        del mask, tp, tc, f_ij
 
         tmp = torch.sum(A_ij, dim=2)
-        res = torch.zeros(f_ij.size(0), tmp.size(1), tmp.size(1)).to(self.device)
+        res = torch.zeros(batch_size, token_size, token_size).to(self.device)
         #tmp = torch.stack([torch.diag(t) for t in tmp])
         res.as_strided(tmp.size(), [res.stride(0), res.size(2) + 1]).copy_(tmp)
         L_ij = -A_ij + res
 
-        del res
+        del res, tmp
 
         L_ij_bar = L_ij
         L_ij_bar[:,0,:] = f_i
@@ -74,7 +72,7 @@ class StructuredAttention(nn.Module):
 
         dx = mask1 * tmp1 - mask2 * tmp2
 
-        del mask1, mask2
+        del tmp1, tmp2, temp11, temp12, temp21, temp22, mask1, mask2, L_ij_bar, LLinv_diag, A_ij, f_i, LLinv, L_ij
 
         d = torch.cat([d0.unsqueeze(1), dx], dim = 1)
         df = d.transpose(1,2)
@@ -82,7 +80,7 @@ class StructuredAttention(nn.Module):
         ssr = torch.cat([self.exparam.repeat(batch_size,1,1), sem_v], 1)
         pinp = torch.bmm(df, ssr)
 
-        cinp = torch.bmm(dx, sem_v)
+        #cinp = torch.bmm(dx, sem_v)
 
         finp = torch.cat([sem_v, pinp],dim = 2)
         output = F.relu(self.fzlinear(finp))
