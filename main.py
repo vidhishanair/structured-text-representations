@@ -128,48 +128,48 @@ def run(config, device):
     num_steps = config.epochs * num_batches_per_epoch
     total_loss = 0
 
-    try:
-        for ct, batch in tqdm.tqdm(train_batches, total=num_steps):
-            model.train()
-            value, feed_dict = get_feed_dict(batch, device) # batch = [Instances], feed_dict = {inputs}
-            #for obj in gc.get_objects():
-            #    if torch.is_tensor(obj):
-            #        print("GC2: "+str(type(obj))+" "+str(obj.size()))
-            if not value:
-                continue
-            output = model.forward(feed_dict)
-            target = feed_dict['gold_labels']
-            loss = criterion(output, target)
+    # try:
+    for ct, batch in tqdm.tqdm(train_batches, total=num_steps):
+        model.train()
+        value, feed_dict = get_feed_dict(batch, device) # batch = [Instances], feed_dict = {inputs}
+        #for obj in gc.get_objects():
+        #    if torch.is_tensor(obj):
+        #        print("GC2: "+str(type(obj))+" "+str(obj.size()))
+        if not value:
+            continue
+        output = model.forward(feed_dict)
+        target = feed_dict['gold_labels']
+        loss = criterion(output, target)
 
-            optimizer.zero_grad()
-            loss.backward()
-            #torch.nn.utils.clip_grad_norm(model.parameters(), config.clip)
-            optimizer.step()
+        optimizer.zero_grad()
+        loss.backward()
+        #torch.nn.utils.clip_grad_norm(model.parameters(), config.clip)
+        optimizer.step()
 
-            total_loss += loss.item()
-            if(ct!= 0 and ct%config.log_period==0):
-                acc_test = evaluate(model, test_batches, device)
-                acc_dev = evaluate(model, dev_batches, device)
-                print('Step: {} Loss: {}\n'.format(ct, total_loss))
-                print('Test ACC: {}\n'.format(acc_test))
-                print('Dev  ACC: {}\n'.format(acc_dev))
-                logger.debug('Step: {} Loss: {}\n'.format(ct, total_loss))
-                logger.debug('Test ACC: {}\n'.format(acc_test))
-                logger.debug('Dev  ACC: {}\n'.format(acc_dev))
-                logger.handlers[0].flush()
-                total_loss = 0
-            del feed_dict['token_idxs']
-            del feed_dict['gold_labels']
-            torch.cuda.empty_cache()
+        total_loss += loss.item()
+        if(ct!= 0 and ct%config.log_period==0):
+            acc_test = evaluate(model, test_batches, device)
+            acc_dev = evaluate(model, dev_batches, device)
+            print('Step: {} Loss: {}\n'.format(ct, total_loss))
+            print('Test ACC: {}\n'.format(acc_test))
+            print('Dev  ACC: {}\n'.format(acc_dev))
+            logger.debug('Step: {} Loss: {}\n'.format(ct, total_loss))
+            logger.debug('Test ACC: {}\n'.format(acc_test))
+            logger.debug('Dev  ACC: {}\n'.format(acc_dev))
+            logger.handlers[0].flush()
+            total_loss = 0
+        del feed_dict['token_idxs']
+        del feed_dict['gold_labels']
+        torch.cuda.empty_cache()
             #for obj in gc.get_objects():
             #    if torch.is_tensor(obj):
             #        print("GC3: "+str(type(obj))+" "+str(obj.size()))
             # saver.save(sess, 'my_test_model',global_step=1000)
-    except:
-        torch.cuda.empty_cache()
-        for obj in gc.get_objects():
-            if torch.is_tensor(obj):
-                print("GC: "+str(type(obj))+" "+str(obj.size()))
+    # except:
+    #     torch.cuda.empty_cache()
+    #     for obj in gc.get_objects():
+    #         if torch.is_tensor(obj):
+    #             print("GC: "+str(type(obj))+" "+str(obj.size()))
 
 parser = argparse.ArgumentParser(description='PyTorch Definition Generation Model')
 parser.add_argument('--cuda', action='store_true', default=False, help='use CUDA')
