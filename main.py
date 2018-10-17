@@ -17,8 +17,8 @@ def load_data(config):
     train, dev, test, embeddings, vocab = pickle.load(open(config.data_file, 'rb'))
     trainset, devset, testset = DataSet(train), DataSet(dev), DataSet(test)
     vocab = dict([(v['index'],k) for k,v in vocab.items()])
-    trainset.sort()
-    train_batches = trainset.get_batches(config.batch_size, config.epochs, rand=True)
+    trainset.sort(reverse=True)
+    train_batches = trainset.get_batches(config.batch_size, config.epochs, rand=False)
     dev_batches = devset.get_batches(config.batch_size, 1, rand=False)
     test_batches = testset.get_batches(config.batch_size, 1, rand=False)
     dev_batches = [i for i in dev_batches]
@@ -51,16 +51,17 @@ def get_feed_dict(batch, device):
     mask_parser_2 = np.ones([batch_size, max_doc_l, max_doc_l], np.float32)
     mask_parser_1[:, :, 0] = 0
     mask_parser_2[:, 0, :] = 0
-    if (batch_size * max_doc_l * max_sent_l * max_sent_l > 12 * 80000):
+    print(torch.LongTensor(token_idxs_matrix).size())
+    if (batch_size * max_doc_l * max_sent_l * max_sent_l > 12 * 100000):
         return False, [batch_size * max_doc_l * max_sent_l * max_sent_l / (12 * 200000) + 1]
 
     # if (self.config.large_data):
     #     if (batch_size * max_doc_l * max_sent_l * max_sent_l > 16 * 200000):
     #         return [batch_size * max_doc_l * max_sent_l * max_sent_l / (16 * 200000) + 1]
-    if max_doc_l == 1 or max_sent_l == 1:
+    if max_doc_l == 1 or max_sent_l == 1 or max_doc_l >40 or max_sent_l>40:
         return False, {}
     feed_dict = {'token_idxs': torch.LongTensor(token_idxs_matrix).to(device), 'gold_labels': torch.LongTensor(gold_matrix).to(device)}
-
+    #print(feed_dict['token_idxs'].size())
     # , 'sent_l': torch.LongTensor(sent_l_matrix).to(device),
     #              'mask_tokens': torch.LongTensor(mask_tokens_matrix).to(device), 'mask_sents': torch.LongTensor(mask_sents_matrix).to(device),
     #              'doc_l': torch.LongTensor(doc_l_matrix).to(device), 'gold_labels': torch.LongTensor(gold_matrix).to(device),
@@ -130,47 +131,51 @@ def run(config, device):
 
     # try:
     count = 0
-    for ct, batch in tqdm.tqdm(train_batches, total=num_steps):
-        model.train()
-        value, feed_dict = get_feed_dict(batch, device) # batch = [Instances], feed_dict = {inputs}
-        #for obj in gc.get_objects():
-        #    if torch.is_tensor(obj):
-        #        print("GC2: "+str(type(obj))+" "+str(obj.size()))
-        if not value:
-            continue
-        output = model.forward(feed_dict)
-        target = feed_dict['gold_labels']
-        loss = criterion(output, target)
+    try:
+        for ct, batch in tqdm.tqdm(train_batches, total=num_steps):
+            model.train()
+            torch.cuda.empty_cache()
+            value, feed_dict = get_feed_dict(batch, device) # batch = [Instances], feed_dict = {inputs}
+            #for obj in gc.get_objects():
+            #    if torch.is_tensor(obj):
+            #        print("GC2: "+str(type(obj))+" "+str(obj.size()))
+            if not value:
+                continue
+            output = model.forward(feed_dict)
+            target = feed_dict['gold_labels']
+            loss = criterion(output, target)
 
-        optimizer.zero_grad()
-        loss.backward()
-        #torch.nn.utils.clip_grad_norm(model.parameters(), config.clip)
-        optimizer.step()
+            optimizer.zero_grad()
+            loss.backward()
+            #torch.nn.utils.clip_grad_norm(model.parameters(), config.clip)
+            optimizer.step()
 
-        total_loss += loss.item()
-        if(ct!= 0 and ct%config.log_period==0):
-            acc_test = evaluate(model, test_batches, device)
-            acc_dev = evaluate(model, dev_batches, device)
-            print('Step: {} Loss: {}\n'.format(ct, total_loss))
-            print('Test ACC: {}\n'.format(acc_test))
-            print('Dev  ACC: {}\n'.format(acc_dev))
-            logger.debug('Step: {} Loss: {}\n'.format(ct, total_loss))
-            logger.debug('Test ACC: {}\n'.format(acc_test))
-            logger.debug('Dev  ACC: {}\n'.format(acc_dev))
-            logger.handlers[0].flush()
-            total_loss = 0
-        del feed_dict['token_idxs']
-        del feed_dict['gold_labels']
-        torch.cuda.empty_cache()
+            total_loss += loss.item()
+            if(ct!= 0 and ct%config.log_period==0):
+                acc_test = evaluate(model, test_batches, device)
+                acc_dev = evaluate(model, dev_batches, device)
+                print('Step: {} Loss: {}\n'.format(ct, total_loss))
+                print('Test ACC: {}\n'.format(acc_test))
+                print('Dev  ACC: {}\n'.format(acc_dev))
+                logger.debug('Step: {} Loss: {}\n'.format(ct, total_loss))
+                logger.debug('Test ACC: {}\n'.format(acc_test))
+                logger.debug('Dev  ACC: {}\n'.format(acc_dev))
+                logger.handlers[0].flush()
+                total_loss = 0
+            loss = 0
+            del feed_dict['token_idxs']
+            del feed_dict['gold_labels']
+            torch.cuda.empty_cache()
             #for obj in gc.get_objects():
             #    if torch.is_tensor(obj):
             #        print("GC3: "+str(type(obj))+" "+str(obj.size()))
             # saver.save(sess, 'my_test_model',global_step=1000)
-    # except:
-    #     torch.cuda.empty_cache()
-    #     for obj in gc.get_objects():
-    #         if torch.is_tensor(obj):
-    #             print("GC: "+str(type(obj))+" "+str(obj.size()))
+    except Exception as e:
+        print(e)
+        torch.cuda.empty_cache()
+        for obj in gc.get_objects():
+            if torch.is_tensor(obj):
+                print("GC: "+str(type(obj))+" "+str(obj.size()))
 
 parser = argparse.ArgumentParser(description='PyTorch Definition Generation Model')
 parser.add_argument('--cuda', action='store_true', default=False, help='use CUDA')

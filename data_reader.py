@@ -42,12 +42,12 @@ class DataSet:
         self.data = data
         self.num_examples = len(self.data)
 
-    def sort(self):
+    def sort(self, reverse=False):
         random.shuffle(self.data)
         print(len(self.data))
         print(self.data[0]._max_sent_len())
-        self.data = sorted(self.data, key=lambda x: x._max_sent_len())
-        self.data = sorted(self.data, key=lambda x: x._doc_len())
+        self.data = sorted(self.data, key=lambda x: x._max_sent_len(), reverse=reverse)
+        self.data = sorted(self.data, key=lambda x: x._doc_len(), reverse=reverse)
 
     def get_by_idxs(self, idxs):
         return [self.data[idx] for idx in idxs]

@@ -11,6 +11,7 @@ class DocumentClassificationModel(nn.Module):
         super(DocumentClassificationModel, self).__init__()
         self.device = device
         self.word_lookup = nn.Embedding(vocab_size, token_emb_size)
+        self.word_lookup.weight.requires_grad = False
         #self.drop = nn.Dropout(dropout)
         #self.emb_drop = nn.Dropout(dropout)
         if pretrained is not None:
