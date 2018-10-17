@@ -51,23 +51,13 @@ def get_feed_dict(batch, device):
     mask_parser_2 = np.ones([batch_size, max_doc_l, max_doc_l], np.float32)
     mask_parser_1[:, :, 0] = 0
     mask_parser_2[:, 0, :] = 0
-    print(torch.LongTensor(token_idxs_matrix).size())
+    # print(torch.LongTensor(token_idxs_matrix).size())
     if (batch_size * max_doc_l * max_sent_l * max_sent_l > 12 * 100000):
         return False, [batch_size * max_doc_l * max_sent_l * max_sent_l / (12 * 200000) + 1]
 
-    # if (self.config.large_data):
-    #     if (batch_size * max_doc_l * max_sent_l * max_sent_l > 16 * 200000):
-    #         return [batch_size * max_doc_l * max_sent_l * max_sent_l / (16 * 200000) + 1]
     if max_doc_l == 1 or max_sent_l == 1 or max_doc_l >40 or max_sent_l>40:
         return False, {}
     feed_dict = {'token_idxs': torch.LongTensor(token_idxs_matrix).to(device), 'gold_labels': torch.LongTensor(gold_matrix).to(device)}
-    #print(feed_dict['token_idxs'].size())
-    # , 'sent_l': torch.LongTensor(sent_l_matrix).to(device),
-    #              'mask_tokens': torch.LongTensor(mask_tokens_matrix).to(device), 'mask_sents': torch.LongTensor(mask_sents_matrix).to(device),
-    #              'doc_l': torch.LongTensor(doc_l_matrix).to(device), 'gold_labels': torch.LongTensor(gold_matrix).to(device),
-    #              'max_sent_l': torch.LongTensor(max_sent_l).to(device), 'max_doc_l': torch.LongTensor(max_doc_l).to(device),
-    #              'mask_parser_1': torch.LongTensor(mask_parser_1).to(device), 'mask_parser_2': torch.LongTensor(mask_parser_2).to(device),
-    #              'batch_l': torch.LongTensor(batch_size).to(device)}
     return True, feed_dict
 
 
@@ -87,14 +77,11 @@ def evaluate(model, test_batches, device):
         count += 1
         del feed_dict['token_idxs']
         del feed_dict['gold_labels']
-        torch.cuda.empty_cache()
         del feed_dict
+        torch.cuda.empty_cache()
+    print(corr_count, all_count)
     acc_test = 1.0 * corr_count / all_count
     return acc_test
-
-
-# def get_loss(output, target, criterion):
-#     loss = criterion(output, target)
 
 
 def run(config, device):
@@ -122,23 +109,15 @@ def run(config, device):
     optimizer = optim.Adagrad(filter(lambda p: p.requires_grad, model.parameters()), lr=config.lr)
 
     
-    #for obj in gc.get_objects():
-    #    if torch.is_tensor(obj):
-    #        print("GC1: "+str(type(obj))+" "+str(obj.size()))
     num_batches_per_epoch = int(num_examples / config.batch_size)
     num_steps = config.epochs * num_batches_per_epoch
     total_loss = 0
 
-    # try:
-    count = 0
     try:
         for ct, batch in tqdm.tqdm(train_batches, total=num_steps):
             model.train()
             torch.cuda.empty_cache()
             value, feed_dict = get_feed_dict(batch, device) # batch = [Instances], feed_dict = {inputs}
-            #for obj in gc.get_objects():
-            #    if torch.is_tensor(obj):
-            #        print("GC2: "+str(type(obj))+" "+str(obj.size()))
             if not value:
                 continue
             output = model.forward(feed_dict)
@@ -147,11 +126,11 @@ def run(config, device):
 
             optimizer.zero_grad()
             loss.backward()
-            #torch.nn.utils.clip_grad_norm(model.parameters(), config.clip)
+            torch.nn.utils.clip_grad_norm(model.parameters(), config.clip)
             optimizer.step()
 
             total_loss += loss.item()
-            if(ct!= 0 and ct%config.log_period==0):
+            if ct!= 0 and ct%config.log_period==0 :
                 acc_test = evaluate(model, test_batches, device)
                 acc_dev = evaluate(model, dev_batches, device)
                 print('Step: {} Loss: {}\n'.format(ct, total_loss))
@@ -166,16 +145,14 @@ def run(config, device):
             del feed_dict['token_idxs']
             del feed_dict['gold_labels']
             torch.cuda.empty_cache()
-            #for obj in gc.get_objects():
-            #    if torch.is_tensor(obj):
-            #        print("GC3: "+str(type(obj))+" "+str(obj.size()))
-            # saver.save(sess, 'my_test_model',global_step=1000)
+
     except Exception as e:
         print(e)
         torch.cuda.empty_cache()
         for obj in gc.get_objects():
             if torch.is_tensor(obj):
                 print("GC: "+str(type(obj))+" "+str(obj.size()))
+
 
 parser = argparse.ArgumentParser(description='PyTorch Definition Generation Model')
 parser.add_argument('--cuda', action='store_true', default=False, help='use CUDA')
