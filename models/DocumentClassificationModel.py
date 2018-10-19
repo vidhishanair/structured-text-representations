@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from models.modules.BiLSTMEncoder import BiLSTMEncoder
 from models.modules.StructuredAttention import StructuredAttention
+import time
 
 
 class DocumentClassificationModel(nn.Module):
@@ -11,7 +12,7 @@ class DocumentClassificationModel(nn.Module):
         super(DocumentClassificationModel, self).__init__()
         self.device = device
         self.word_lookup = nn.Embedding(vocab_size, token_emb_size)
-        self.word_lookup.weight.requires_grad = False
+        #self.word_lookup.weight.requires_grad = False
         #self.drop = nn.Dropout(dropout)
         #self.emb_drop = nn.Dropout(dropout)
         if pretrained is not None:
@@ -32,6 +33,8 @@ class DocumentClassificationModel(nn.Module):
         :param input: batch*document_size*sent_size
         :return: batch*document_size*sent_size*hidden_dim
         """
+        start_time = time.time()
+        
         batch_size, sent_size, token_size = input['token_idxs'].size()
         # sent_l = input['sent_l']
         # sent_mask = input['mask_tokens']
@@ -42,22 +45,33 @@ class DocumentClassificationModel(nn.Module):
 
         #BiLSTM
         encoded_sentences, hidden = self.sentence_encoder.forward(input)
-
+#         print("--- %s seconds for BiLSTM ---" % (time.time() - start_time))
+        
+        
         #Structure ATT
         encoded_sentences = self.sentence_structure_att.forward(encoded_sentences)
-
+#         print("--- %s seconds for Structured Attention for sentence ---" % (time.time() - start_time))
+        
         #Reshape and max pool
         encoded_sentences = encoded_sentences.contiguous().view(batch_size, sent_size, token_size, encoded_sentences.size(2))
         encoded_sentences = encoded_sentences.max(dim=2)[0] # Batch * sent * dim
-
+#         print("--- %s seconds for Reshaping and pooling ---" % (time.time() - start_time))
+        
         #Doc BiLSTM
         encoded_documents, hidden = self.document_encoder.forward(encoded_sentences)
+#         print("--- %s seconds for BiLSTM for document ---" % (time.time() - start_time))
         #structure Att
+        
         encoded_documents = self.document_structure_att.forward(encoded_documents)
+#         print("--- %s seconds for Structured Attention document ---" % (time.time() - start_time)) 
+        
+        #print(encoded_documents.size())
         #Max Pool
         encoded_documents = encoded_documents.max(dim=1)[0]
 
         #Linear for output
         output = self.linear_out(encoded_documents)
-
+        
+#         print("--- %s seconds final ---" % (time.time() - start_time))
+        
         return output

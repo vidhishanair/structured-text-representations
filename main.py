@@ -51,11 +51,12 @@ def get_feed_dict(batch, device):
     mask_parser_2 = np.ones([batch_size, max_doc_l, max_doc_l], np.float32)
     mask_parser_1[:, :, 0] = 0
     mask_parser_2[:, 0, :] = 0
-    # print(torch.LongTensor(token_idxs_matrix).size())
-    if (batch_size * max_doc_l * max_sent_l * max_sent_l > 12 * 100000):
+    if (batch_size * max_doc_l * max_sent_l * max_sent_l > 12 * 90000):
+        #print("Multi size: "+str(torch.LongTensor(token_idxs_matrix).size()))
         return False, [batch_size * max_doc_l * max_sent_l * max_sent_l / (12 * 200000) + 1]
 
     if max_doc_l == 1 or max_sent_l == 1 or max_doc_l >40 or max_sent_l>40:
+        #print("1 or 60 size: "+str(torch.LongTensor(token_idxs_matrix).size()))
         return False, {}
     feed_dict = {'token_idxs': torch.LongTensor(token_idxs_matrix).to(device), 'gold_labels': torch.LongTensor(gold_matrix).to(device)}
     return True, feed_dict
@@ -73,6 +74,7 @@ def evaluate(model, test_batches, device):
         output = model.forward(feed_dict)
         predictions = output.max(1)[1]
         corr_count += torch.sum(predictions == feed_dict['gold_labels']).item()
+        #print(feed_dict['gold_labels'])
         all_count += len(batch)
         count += 1
         del feed_dict['token_idxs']
@@ -105,7 +107,7 @@ def run(config, device):
     # logger.critical(str(config.__flags))
 
     model = DocumentClassificationModel(device, config.n_embed, config.d_embed, config.dim_hidden, config.dim_hidden, 1, 1, config.dim_sem, pretrained=embedding_matrix, dropout=config.dropout).to(device)
-    criterion = nn.CrossEntropyLoss(ignore_index=0)
+    criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adagrad(filter(lambda p: p.requires_grad, model.parameters()), lr=config.lr)
 
     
@@ -115,21 +117,6 @@ def run(config, device):
 
     try:
         for ct, batch in tqdm.tqdm(train_batches, total=num_steps):
-            model.train()
-            torch.cuda.empty_cache()
-            value, feed_dict = get_feed_dict(batch, device) # batch = [Instances], feed_dict = {inputs}
-            if not value:
-                continue
-            output = model.forward(feed_dict)
-            target = feed_dict['gold_labels']
-            loss = criterion(output, target)
-
-            optimizer.zero_grad()
-            loss.backward()
-            torch.nn.utils.clip_grad_norm(model.parameters(), config.clip)
-            optimizer.step()
-
-            total_loss += loss.item()
             if ct!= 0 and ct%config.log_period==0 :
                 acc_test = evaluate(model, test_batches, device)
                 acc_dev = evaluate(model, dev_batches, device)
@@ -141,6 +128,21 @@ def run(config, device):
                 logger.debug('Dev  ACC: {}\n'.format(acc_dev))
                 logger.handlers[0].flush()
                 total_loss = 0
+            model.train()
+            torch.cuda.empty_cache()
+            value, feed_dict = get_feed_dict(batch, device) # batch = [Instances], feed_dict = {inputs}
+            if not value:
+                continue
+            output = model.forward(feed_dict)
+            target = feed_dict['gold_labels']
+            loss = criterion(output, target)
+
+            optimizer.zero_grad()
+            loss.backward()
+            #torch.nn.utils.clip_grad_norm(model.parameters(), config.clip)
+            optimizer.step()
+
+            total_loss += loss.item()
             loss = 0
             del feed_dict['token_idxs']
             del feed_dict['gold_labels']
