@@ -60,7 +60,7 @@ class DocumentClassificationModel(nn.Module):
         
         #Reshape and max pool
         encoded_sentences = encoded_sentences.contiguous().view(batch_size, sent_size, token_size, encoded_sentences.size(2))
-        encoded_sentences = encoded_sentences + ((tokens_mask-1)*9999).unsqueeze(3).contiguous().view(batch_size, sent_size, token_size, encoded_sentences.size(3))
+        encoded_sentences = encoded_sentences + ((tokens_mask-1)*9999).unsqueeze(3).repeat(1,1,1,encoded_sentences.size(3))
         encoded_sentences = encoded_sentences.max(dim=2)[0] # Batch * sent * dim
 #         print("--- %s seconds for Reshaping and pooling ---" % (time.time() - start_time))
         
@@ -74,7 +74,7 @@ class DocumentClassificationModel(nn.Module):
         
         #print(encoded_documents.size())
         #Max Pool
-        encoded_documents = encoded_documents + ((sent_mask-1)*9999).unsqueeze(2).contiguous().view(batch_size, sent_size, encoded_documents.size(2))
+        encoded_documents = encoded_documents + ((sent_mask-1)*9999).unsqueeze(2).repeat(1,1,encoded_documents.size(2))
         encoded_documents = encoded_documents.max(dim=1)[0]
 
         encoded_documents = F.relu(self.pre_lin1(encoded_documents))

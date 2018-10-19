@@ -60,8 +60,8 @@ def get_feed_dict(batch, device):
         return False, {}
     feed_dict = {'token_idxs': torch.LongTensor(token_idxs_matrix).to(device),
                  'gold_labels': torch.LongTensor(gold_matrix).to(device),
-                 'mask_tokens': torch.LonhTensor(mask_tokens_matrix).to(device),
-                 'mask_sents': torch.LongTensor(mask_sents_matrix).to(device)}
+                 'mask_tokens': torch.FloatTensor(mask_tokens_matrix).to(device),
+                 'mask_sents': torch.FloatTensor(mask_sents_matrix).to(device)}
     return True, feed_dict
 
 
