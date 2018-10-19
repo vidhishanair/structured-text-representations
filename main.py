@@ -58,7 +58,10 @@ def get_feed_dict(batch, device):
     if max_doc_l == 1 or max_sent_l == 1 or max_doc_l >40 or max_sent_l>40:
         #print("1 or 60 size: "+str(torch.LongTensor(token_idxs_matrix).size()))
         return False, {}
-    feed_dict = {'token_idxs': torch.LongTensor(token_idxs_matrix).to(device), 'gold_labels': torch.LongTensor(gold_matrix).to(device)}
+    feed_dict = {'token_idxs': torch.LongTensor(token_idxs_matrix).to(device),
+                 'gold_labels': torch.LongTensor(gold_matrix).to(device),
+                 'mask_tokens': torch.LonhTensor(mask_tokens_matrix).to(device),
+                 'mask_sents': torch.LongTensor(mask_sents_matrix).to(device)}
     return True, feed_dict
 
 

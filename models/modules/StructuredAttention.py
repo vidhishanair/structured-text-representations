@@ -40,11 +40,11 @@ class StructuredAttention(nn.Module):
 
         del mask, tp, tc, f_ij
 
-        tmp = torch.sum(A_ij, dim=2)
+        tmp = torch.sum(A_ij, dim=1)
         res = torch.zeros(batch_size, token_size, token_size).to(self.device)
         #tmp = torch.stack([torch.diag(t) for t in tmp])
         res.as_strided(tmp.size(), [res.stride(0), res.size(2) + 1]).copy_(tmp)
-        L_ij = -A_ij + res
+        L_ij = -A_ij + res   #A_ij has 0s as diagonals
 
         del res, tmp
 
@@ -54,6 +54,9 @@ class StructuredAttention(nn.Module):
         #No batch inverse
         LLinv = torch.stack([torch.inverse(li) for li in L_ij_bar])
         #LLinv = b_inv(L_ij_bar, self.device).contiguous()
+
+
+
         d0 = f_i * LLinv[:,:,0]
 
         LLinv_diag = torch.diagonal(LLinv, dim1=-2, dim2=-1).unsqueeze(2)
@@ -80,81 +83,9 @@ class StructuredAttention(nn.Module):
         ssr = torch.cat([self.exparam.repeat(batch_size,1,1), sem_v], 1)
         pinp = torch.bmm(df, ssr)
 
-        #cinp = torch.bmm(dx, sem_v)
+        cinp = torch.bmm(dx, sem_v)
 
         finp = torch.cat([sem_v, pinp],dim = 2)
-        output = F.relu(self.fzlinear(finp))
-
-        return output
-
-
-    def aditya_code(self, input_var):
-        batch_size, num_words, inp_dim = input_var.size()
-
-        # assert inp_dim == self.input_dim, "Dimensions Mismatch Expected %s, Got %s" % (self.input_dim, inp_dim)
-
-        inpe = input_var[:,:,:self.rep_dim]
-        inpd = input_var[:,:,self.rep_dim:]
-
-        tp = F.tanh(self.tp_linear(inpd))
-        tc = F.tanh(self.tc_linear(inpd))
-
-        tpr = tp.repeat(1,1,num_words).view(batch_size,num_words,num_words,self.att_dim) \
-            .view(batch_size*num_words*num_words,self.att_dim)
-        tcr = tc.repeat(1,num_words,1).view(batch_size,num_words,num_words,self.att_dim) \
-            .view(batch_size*num_words*num_words,self.att_dim)
-
-        fij = self.bilinear(tpr,tcr).view(batch_size, num_words, num_words)
-
-        fr = torch.exp(self.fi_linear(inpd).squeeze(2))
-
-        Aij = torch.exp(fij)
-        maskij = 1.-torch.eye(num_words).unsqueeze(0).expand(batch_size, num_words, num_words).to(self.device)
-
-        Aij = Aij*maskij
-
-        Di = torch.sum(Aij, dim = 1)
-        Dij = torch.stack([torch.diag(di) for di in Di])
-        Lij = -Aij + Dij
-
-        LLij = Lij[:,1:,:]
-        Lfr = fr.unsqueeze(1)
-        LLxij = torch.cat([Lfr, LLij], dim = 1)
-
-        #Batch Inverse not available in Pytorch
-        LLinv = torch.stack([torch.inverse(li) for li in LLxij])
-        #LLinv = b_inv(LLxij, self.device).contiguous()
-
-
-        d0 = fr * LLinv[:,:,0]
-
-        #Batch Diagonalization not available in pytorch
-        LLinv_diag = torch.stack([torch.diag(lid) for lid in LLinv]).unsqueeze(2)
-
-        tmp1 = (LLinv_diag * Aij.transpose(1,2)).transpose(1,2)
-        tmp2 = Aij * LLinv_diag.transpose(1,2)
-
-        temp11 = torch.zeros(batch_size,num_words,1)
-        temp21 = torch.zeros(batch_size,1,num_words)
-
-        temp12 = torch.ones(batch_size,num_words,num_words-1)
-        temp22 = torch.ones(batch_size,num_words-1,num_words)
-
-        mask1 = torch.cat([temp11,temp12],2).to(self.device)
-        mask2 = torch.cat([temp21,temp22],1).to(self.device)
-
-
-        dx = mask1 * tmp1 - mask2 * tmp2
-
-        d = torch.cat([d0.unsqueeze(1), dx], dim = 1)
-        df = d.transpose(1,2)
-
-        ssr = torch.cat([self.exparam.repeat(batch_size,1,1), inpe], 1)
-        pinp = torch.bmm(df, ssr)
-
-        cinp = torch.bmm(dx, inpe)
-
-        finp = torch.cat([inpe, pinp],dim = 2)
         output = F.relu(self.fzlinear(finp))
 
         return output

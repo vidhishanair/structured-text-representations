@@ -24,6 +24,9 @@ class DocumentClassificationModel(nn.Module):
         self.sentence_structure_att = StructuredAttention(device, sem_dim_size, sent_hidden_size)
         self.document_structure_att = StructuredAttention(device, sem_dim_size, doc_hidden_size)
 
+        self.pre_lin1 = nn.Linear(sem_dim_size, sem_dim_size)
+        self.pre_lin2 = nn.Linear(sem_dim_size, sem_dim_size)
+
         self.linear_out = nn.Linear(sem_dim_size, 5)
 
 
@@ -37,7 +40,10 @@ class DocumentClassificationModel(nn.Module):
         
         batch_size, sent_size, token_size = input['token_idxs'].size()
         # sent_l = input['sent_l']
-        # sent_mask = input['mask_tokens']
+
+        tokens_mask = input['mask_tokens']
+        sent_mask = input['mask_sents']
+
         input = self.word_lookup(input['token_idxs'])
         #input = self.emb_drop(input)
         #reshape to 3D tensor
@@ -54,6 +60,7 @@ class DocumentClassificationModel(nn.Module):
         
         #Reshape and max pool
         encoded_sentences = encoded_sentences.contiguous().view(batch_size, sent_size, token_size, encoded_sentences.size(2))
+        encoded_sentences = encoded_sentences + ((tokens_mask-1)*9999).unsqueeze(3).contiguous().view(batch_size, sent_size, token_size, encoded_sentences.size(3))
         encoded_sentences = encoded_sentences.max(dim=2)[0] # Batch * sent * dim
 #         print("--- %s seconds for Reshaping and pooling ---" % (time.time() - start_time))
         
@@ -67,7 +74,11 @@ class DocumentClassificationModel(nn.Module):
         
         #print(encoded_documents.size())
         #Max Pool
+        encoded_documents = encoded_documents + ((sent_mask-1)*9999).unsqueeze(2).contiguous().view(batch_size, sent_size, encoded_documents.size(2))
         encoded_documents = encoded_documents.max(dim=1)[0]
+
+        encoded_documents = F.relu(self.pre_lin1(encoded_documents))
+        encoded_documents = F.relu(self.pre_lin2(encoded_documents))
 
         #Linear for output
         output = self.linear_out(encoded_documents)
