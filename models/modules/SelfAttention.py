@@ -4,13 +4,14 @@ import torch.nn.functional as F
 
 
 
-class StructuredAttention(nn.Module):
-    def __init__(self, device, sem_dim_size, sent_hiddent_size, bidirectional):
-        super(StructuredAttention, self).__init__()
+class SelfAttention(nn.Module):
+    def __init__(self, device, sem_dim_size, sent_hiddent_size):
+        super(SelfAttention, self).__init__()
         self.device = device
-        self.bidirectional = bidirectional
         self.sem_dim_size = sem_dim_size
+        self.att_dim = sem_dim_size
         self.str_dim_size = sent_hiddent_size - self.sem_dim_size
+        self.rep_dim = sem_dim_size
         self.tp_linear = nn.Linear(self.str_dim_size, self.str_dim_size, bias=True)
         self.tc_linear = nn.Linear(self.str_dim_size, self.str_dim_size, bias=True)
         self.fi_linear = nn.Linear(self.str_dim_size, 1, bias=True)
@@ -22,13 +23,8 @@ class StructuredAttention(nn.Module):
     def forward(self, input): #batch*sent * token * hidden
         batch_size, token_size, dim_size = input.size()
 
-        if(self.bidirectional):
-            input = input.view(batch_size, token_size, 2, dim_size//2)
-            sem_v = torch.cat((input[:,:,0,:self.sem_dim_size//2],input[:,:,1,:self.sem_dim_size//2]),2)
-            str_v = torch.cat((input[:,:,0,self.sem_dim_size//2:],input[:,:,1,self.sem_dim_size//2:]),2)
-        else:
-            sem_v = input[:,:,:self.sem_dim_size]
-            str_v = input[:,:,self.sem_dim_size:]
+        sem_v = input[:,:,:self.sem_dim_size]
+        str_v = input[:,:,self.sem_dim_size:]
 
         tp = F.tanh(self.tp_linear(str_v)) # b*s, token, h1
         tc = F.tanh(self.tc_linear(str_v)) # b*s, token, h1
@@ -90,7 +86,7 @@ class StructuredAttention(nn.Module):
         cinp = torch.bmm(dx, sem_v)
 
         finp = torch.cat([sem_v, pinp, cinp],dim = 2)
-        
+
         output = F.relu(self.fzlinear(finp))
 
         return output

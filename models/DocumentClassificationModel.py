@@ -8,7 +8,7 @@ import time
 
 
 class DocumentClassificationModel(nn.Module):
-    def __init__(self, device, vocab_size, token_emb_size, sent_hidden_size, doc_hidden_size, sent_num_layers, doc_num_layers, sem_dim_size, pretrained=None, dropout=0.5):
+    def __init__(self, device, vocab_size, token_emb_size, sent_hidden_size, doc_hidden_size, sent_num_layers, doc_num_layers, sem_dim_size, pretrained=None, dropout=0.5, bidirectional=True):
         super(DocumentClassificationModel, self).__init__()
         self.device = device
         self.word_lookup = nn.Embedding(vocab_size, token_emb_size)
@@ -18,11 +18,11 @@ class DocumentClassificationModel(nn.Module):
         if pretrained is not None:
             self.word_lookup.weight.data.copy_(torch.from_numpy(pretrained))
         del pretrained
-        self.sentence_encoder = BiLSTMEncoder(sent_hidden_size, token_emb_size, sent_num_layers)
-        self.document_encoder = BiLSTMEncoder(doc_hidden_size, sem_dim_size, doc_num_layers)
+        self.sentence_encoder = BiLSTMEncoder(sent_hidden_size, token_emb_size, sent_num_layers, dropout, bidirectional)
+        self.document_encoder = BiLSTMEncoder(doc_hidden_size, sem_dim_size, doc_num_layers, dropout, bidirectional)
 
-        self.sentence_structure_att = StructuredAttention(device, sem_dim_size, sent_hidden_size)
-        self.document_structure_att = StructuredAttention(device, sem_dim_size, doc_hidden_size)
+        self.sentence_structure_att = StructuredAttention(device, sem_dim_size, sent_hidden_size, bidirectional)
+        self.document_structure_att = StructuredAttention(device, sem_dim_size, doc_hidden_size, bidirectional)
 
         self.pre_lin1 = nn.Linear(sem_dim_size, sem_dim_size)
         self.pre_lin2 = nn.Linear(sem_dim_size, sem_dim_size)
@@ -46,6 +46,7 @@ class DocumentClassificationModel(nn.Module):
 
         input = self.word_lookup(input['token_idxs'])
         #input = self.emb_drop(input)
+
         #reshape to 3D tensor
         input = input.contiguous().view(input.size(0)*input.size(1), input.size(2), input.size(3))
 
