@@ -18,7 +18,7 @@ class StructuredAttention(nn.Module):
         self.bilinear = nn.Bilinear(self.str_dim_size, self.str_dim_size, 1, bias=True)
 
         self.exparam = nn.Parameter(torch.Tensor(1,1,self.sem_dim_size))
-        self.fzlinear = nn.Linear(2*self.sem_dim_size, self.sem_dim_size)
+        self.fzlinear = nn.Linear(3*self.sem_dim_size, self.sem_dim_size)
 
     def forward(self, input): #batch*sent * token * hidden
         batch_size, token_size, dim_size = input.size()
@@ -85,7 +85,8 @@ class StructuredAttention(nn.Module):
 
         cinp = torch.bmm(dx, sem_v)
 
-        finp = torch.cat([sem_v, pinp],dim = 2)
+        finp = torch.cat([sem_v, pinp, cinp],dim = 2)
+        
         output = F.relu(self.fzlinear(finp))
 
         return output

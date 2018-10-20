@@ -17,8 +17,8 @@ def load_data(config):
     train, dev, test, embeddings, vocab = pickle.load(open(config.data_file, 'rb'))
     trainset, devset, testset = DataSet(train), DataSet(dev), DataSet(test)
     vocab = dict([(v['index'],k) for k,v in vocab.items()])
-    trainset.sort(reverse=True)
-    train_batches = trainset.get_batches(config.batch_size, config.epochs, rand=False)
+    trainset.sort(reverse=False)
+    train_batches = trainset.get_batches(config.batch_size, config.epochs, rand=True)
     dev_batches = devset.get_batches(config.batch_size, 1, rand=False)
     test_batches = testset.get_batches(config.batch_size, 1, rand=False)
     dev_batches = [i for i in dev_batches]
@@ -141,6 +141,7 @@ def run(config, device):
             loss = criterion(output, target)
 
             optimizer.zero_grad()
+            #print(loss.item())
             loss.backward()
             #torch.nn.utils.clip_grad_norm(model.parameters(), config.clip)
             optimizer.step()
