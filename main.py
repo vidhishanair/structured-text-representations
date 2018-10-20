@@ -9,6 +9,7 @@ from models.DocumentClassificationModel import DocumentClassificationModel
 import tqdm
 import torch.optim as optim
 import torch
+import traceback
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -154,6 +155,7 @@ def run(config, device):
 
     except Exception as e:
         print(e)
+        traceback.print_exc()
         torch.cuda.empty_cache()
         for obj in gc.get_objects():
             if torch.is_tensor(obj):

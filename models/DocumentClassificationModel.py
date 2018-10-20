@@ -18,16 +18,24 @@ class DocumentClassificationModel(nn.Module):
         if pretrained is not None:
             self.word_lookup.weight.data.copy_(torch.from_numpy(pretrained))
         del pretrained
-        self.sentence_encoder = BiLSTMEncoder(sent_hidden_size, token_emb_size, sent_num_layers, dropout, bidirectional)
-        self.document_encoder = BiLSTMEncoder(doc_hidden_size, sem_dim_size, doc_num_layers, dropout, bidirectional)
+        if bidirectional:
+            self.sem_dim_size = 2*sem_dim_size
+            self.sent_hidden_size = 2*sent_hidden_size
+            self.doc_hidden_size = 2*doc_hidden_size
+        else:
+            self.sem_dim_size = sem_dim_size
+            self.sent_hidden_size = sent_hidden_size
+            self.doc_hidden_size = doc_hidden_size
+        self.sentence_encoder = BiLSTMEncoder(self.sent_hidden_size, token_emb_size, sent_num_layers, dropout, bidirectional)
+        self.document_encoder = BiLSTMEncoder(self.doc_hidden_size, self.sem_dim_size, doc_num_layers, dropout, bidirectional)
 
-        self.sentence_structure_att = StructuredAttention(device, sem_dim_size, sent_hidden_size, bidirectional)
-        self.document_structure_att = StructuredAttention(device, sem_dim_size, doc_hidden_size, bidirectional)
+        self.sentence_structure_att = StructuredAttention(device, self.sem_dim_size, self.sent_hidden_size, bidirectional)
+        self.document_structure_att = StructuredAttention(device, self.sem_dim_size, self.doc_hidden_size, bidirectional)
 
-        self.pre_lin1 = nn.Linear(sem_dim_size, sem_dim_size)
-        self.pre_lin2 = nn.Linear(sem_dim_size, sem_dim_size)
+        self.pre_lin1 = nn.Linear(self.sem_dim_size, self.sem_dim_size)
+        self.pre_lin2 = nn.Linear(self.sem_dim_size, self.sem_dim_size)
 
-        self.linear_out = nn.Linear(sem_dim_size, 5)
+        self.linear_out = nn.Linear(self.sem_dim_size, 5)
 
 
     def forward(self, input):

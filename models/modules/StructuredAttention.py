@@ -24,8 +24,8 @@ class StructuredAttention(nn.Module):
 
         if(self.bidirectional):
             input = input.view(batch_size, token_size, 2, dim_size//2)
-            sem_v = torch.cat((input[:,:,0,:self.sem_dim_size],input[:,:,1,:self.sem_dim_size]),2)
-            str_v = torch.cat((input[:,:,0,self.sem_dim_size:],input[:,:,1,self.sem_dim_size:]),2)
+            sem_v = torch.cat((input[:,:,0,:self.sem_dim_size//2],input[:,:,1,:self.sem_dim_size//2]),2)
+            str_v = torch.cat((input[:,:,0,self.sem_dim_size//2:],input[:,:,1,self.sem_dim_size//2:]),2)
         else:
             sem_v = input[:,:,:self.sem_dim_size]
             str_v = input[:,:,self.sem_dim_size:]
