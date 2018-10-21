@@ -13,7 +13,7 @@ class BiLSTMEncoder(nn.Module):
             hidden_size = hidden_size//2
         self.device = device
         self.bilstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers,
-                              batch_first=True, bidirectional=bidirectional, dropout=dropout)
+                              batch_first=True, bidirectional=bidirectional)
 
     def forward(self, input, seq_len):
         """

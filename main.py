@@ -154,6 +154,7 @@ def run(config, device):
             #torch.nn.utils.clip_grad_norm(model.parameters(), config.clip)
             optimizer.step()
 
+            print(loss.item())
             total_loss += loss.item()
             loss = 0
             del feed_dict['token_idxs']
