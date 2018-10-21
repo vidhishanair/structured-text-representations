@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 from models.modules.BiLSTMEncoder import BiLSTMEncoder
-from models.modules.StructuredAttention import StructuredAttention
+from models.modules.SA2 import StructuredAttention
 import time
 
 
@@ -29,8 +29,10 @@ class DocumentClassificationModel(nn.Module):
         self.sentence_encoder = BiLSTMEncoder(self.sent_hidden_size, token_emb_size, sent_num_layers, dropout, bidirectional)
         self.document_encoder = BiLSTMEncoder(self.doc_hidden_size, self.sem_dim_size, doc_num_layers, dropout, bidirectional)
 
-        self.sentence_structure_att = StructuredAttention(device, self.sem_dim_size, self.sent_hidden_size, bidirectional)
-        self.document_structure_att = StructuredAttention(device, self.sem_dim_size, self.doc_hidden_size, bidirectional)
+        # self.sentence_structure_att = StructuredAttention(device, self.sem_dim_size, self.sent_hidden_size, bidirectional)
+        # self.document_structure_att = StructuredAttention(device, self.sem_dim_size, self.doc_hidden_size, bidirectional)
+        self.sentence_structure_att = StructuredAttention(device, self.sent_hidden_size//2, self.sem_dim_size//2, bidirectional)
+        self.document_structure_att = StructuredAttention(device, self.doc_hidden_size//2, self.sem_dim_size//2, bidirectional)
 
         self.pre_lin1 = nn.Linear(self.sem_dim_size, self.sem_dim_size)
         self.pre_lin2 = nn.Linear(self.sem_dim_size, self.sem_dim_size)
