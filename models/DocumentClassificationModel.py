@@ -63,11 +63,12 @@ class DocumentClassificationModel(nn.Module):
         encoded_sentences, hidden = self.sentence_encoder.forward(input, sent_l)
 #         print("--- %s seconds for BiLSTM ---" % (time.time() - start_time))
         
-        
+        mask = tokens_mask.view(tokens_mask.size(0)*tokens_mask.size(1), tokens_mask.size(2)).unsqueeze(2).repeat(1,1,encoded_sentences.size(2))
+        encoded_sentences = encoded_sentences * mask
+        del mask
         #Structure ATT
         encoded_sentences = self.sentence_structure_att.forward(encoded_sentences)
 #         print("--- %s seconds for Structured Attention for sentence ---" % (time.time() - start_time))
-        
         #Reshape and max pool
         encoded_sentences = encoded_sentences.contiguous().view(batch_size, sent_size, token_size, encoded_sentences.size(2))
         encoded_sentences = encoded_sentences + ((tokens_mask-1)*9999).unsqueeze(3).repeat(1,1,1,encoded_sentences.size(3))
@@ -77,6 +78,9 @@ class DocumentClassificationModel(nn.Module):
         #Doc BiLSTM
         encoded_documents, hidden = self.document_encoder.forward(encoded_sentences, doc_l)
 #         print("--- %s seconds for BiLSTM for document ---" % (time.time() - start_time))
+        mask = sent_mask.unsqueeze(2).repeat(1,1,encoded_documents.size(2))
+        encoded_documents = encoded_documents * mask
+        del mask
         #structure Att
         
         encoded_documents = self.document_structure_att.forward(encoded_documents)
