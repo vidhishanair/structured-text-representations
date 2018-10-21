@@ -29,14 +29,14 @@ def load_data(config):
 
 def get_feed_dict(batch, device):
     batch_size = len(batch)
-    doc_l_matrix = np.zeros([batch_size], np.int32)
+    doc_l_matrix = np.ones([batch_size], np.int32)
     for i, instance in enumerate(batch):
         n_sents = len(instance.token_idxs)
-        doc_l_matrix[i] = n_sents
+        doc_l_matrix[i] = n_sents if n_sents>0 else 1
     max_doc_l = np.max(doc_l_matrix)
     max_sent_l = max([max([len(sent) for sent in doc.token_idxs]) for doc in batch])
     token_idxs_matrix = np.zeros([batch_size, max_doc_l, max_sent_l], np.int32)
-    sent_l_matrix = np.zeros([batch_size, max_doc_l], np.int32)
+    sent_l_matrix = np.ones([batch_size, max_doc_l], np.int32)
     gold_matrix = np.zeros([batch_size], np.int32)
     mask_tokens_matrix = np.ones([batch_size, max_doc_l, max_sent_l], np.float32)
     mask_sents_matrix = np.ones([batch_size, max_doc_l], np.float32)
@@ -46,7 +46,7 @@ def get_feed_dict(batch, device):
         for j, sent in enumerate(instance.token_idxs):
             token_idxs_matrix[i, j, :len(sent)] = np.asarray(sent)
             mask_tokens_matrix[i, j, len(sent):] = 0
-            sent_l_matrix[i, j] = len(sent)
+            sent_l_matrix[i, j] = len(sent) if len(sent)>0 else 1
         mask_sents_matrix[i, n_sents:] = 0
     mask_parser_1 = np.ones([batch_size, max_doc_l, max_doc_l], np.float32)
     mask_parser_2 = np.ones([batch_size, max_doc_l, max_doc_l], np.float32)
