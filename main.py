@@ -120,25 +120,30 @@ def run(config, device):
     num_batches_per_epoch = int(num_examples / config.batch_size)
     num_steps = config.epochs * num_batches_per_epoch
     total_loss = 0
+    count = 0
 
     try:
         for ct, batch in tqdm.tqdm(train_batches, total=num_steps):
             if ct!= 0 and ct%config.log_period==0 :
                 acc_test = evaluate(model, test_batches, device)
                 acc_dev = evaluate(model, dev_batches, device)
-                print('Step: {} Loss: {}\n'.format(ct, total_loss))
+                print("Trained on {} batches out of {}\n".format(count, config.log_period))
+                print('Step: {} Loss: {}\n'.format(ct, total_loss/count))
                 print('Test ACC: {}\n'.format(acc_test))
                 print('Dev  ACC: {}\n'.format(acc_dev))
-                logger.debug('Step: {} Loss: {}\n'.format(ct, total_loss))
+                logger.debug("Trained on {} batches out of {}\n".format(count, config.log_period))
+                logger.debug('Step: {} Loss: {}\n'.format(ct, total_loss/count))
                 logger.debug('Test ACC: {}\n'.format(acc_test))
                 logger.debug('Dev  ACC: {}\n'.format(acc_dev))
                 logger.handlers[0].flush()
                 total_loss = 0
+                count = 0
             model.train()
             torch.cuda.empty_cache()
             value, feed_dict = get_feed_dict(batch, device) # batch = [Instances], feed_dict = {inputs}
             if not value:
                 continue
+            count += 1
             output = model.forward(feed_dict)
             target = feed_dict['gold_labels']
             loss = criterion(output, target)
