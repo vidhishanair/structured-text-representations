@@ -18,7 +18,7 @@ def load_data(config):
     train, dev, test, embeddings, vocab = pickle.load(open(config.data_file, 'rb'))
     trainset, devset, testset = DataSet(train), DataSet(dev), DataSet(test)
     vocab = dict([(v['index'],k) for k,v in vocab.items()])
-    trainset.sort(reverse=True)
+    trainset.sort(reverse=False)
     train_batches = trainset.get_batches(config.batch_size, config.epochs, rand=True)
     dev_batches = devset.get_batches(config.batch_size, 1, rand=False)
     test_batches = testset.get_batches(config.batch_size, 1, rand=False)
