@@ -13,11 +13,11 @@ class StructuredAttention(nn.Module):
         self.str_dim_size = sent_hiddent_size - self.sem_dim_size
         self.tp_linear = nn.Linear(self.str_dim_size, self.str_dim_size, bias=True)
         self.tc_linear = nn.Linear(self.str_dim_size, self.str_dim_size, bias=True)
-        self.fi_linear = nn.Linear(self.str_dim_size, 1, bias=True)
-        self.bilinear = nn.Bilinear(self.str_dim_size, self.str_dim_size, 1, bias=True)
+        self.fi_linear = nn.Linear(self.str_dim_size, 1, bias=False)
+        self.bilinear = nn.Bilinear(self.str_dim_size, self.str_dim_size, 1, bias=False)
 
         self.exparam = nn.Parameter(torch.Tensor(1,1,self.sem_dim_size))
-        self.fzlinear = nn.Linear(3*self.sem_dim_size, self.sem_dim_size)
+        self.fzlinear = nn.Linear(3*self.sem_dim_size, self.sem_dim_size, bias=True)
 
     def forward(self, input): #batch*sent * token * hidden
         batch_size, token_size, dim_size = input.size()
@@ -65,7 +65,7 @@ class StructuredAttention(nn.Module):
 
         LLinv_diag = torch.diagonal(LLinv, dim1=-2, dim2=-1).unsqueeze(2)
 
-        tmp1 = (LLinv_diag * A_ij.transpose(1,2)).transpose(1,2)
+        tmp1 = (A_ij.transpose(1,2) * LLinv_diag ).transpose(1,2)
         tmp2 = A_ij * LLinv_diag.transpose(1,2)
 
         temp11 = torch.zeros(batch_size, token_size, 1)
