@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from models.modules.BiLSTMEncoder import BiLSTMEncoder
 from models.modules.SA2 import StructuredAttention
+import itertools
 import time
 
 
@@ -26,8 +27,8 @@ class DocumentClassificationModel(nn.Module):
             self.sem_dim_size = sem_dim_size
             self.sent_hidden_size = sent_hidden_size
             self.doc_hidden_size = doc_hidden_size
-        self.sentence_encoder = BiLSTMEncoder(self.sent_hidden_size, token_emb_size, sent_num_layers, dropout, bidirectional)
-        self.document_encoder = BiLSTMEncoder(self.doc_hidden_size, self.sem_dim_size, doc_num_layers, dropout, bidirectional)
+        self.sentence_encoder = BiLSTMEncoder(device, self.sent_hidden_size, token_emb_size, sent_num_layers, dropout, bidirectional)
+        self.document_encoder = BiLSTMEncoder(device, self.doc_hidden_size, self.sem_dim_size, doc_num_layers, dropout, bidirectional)
 
         # self.sentence_structure_att = StructuredAttention(device, self.sem_dim_size, self.sent_hidden_size, bidirectional)
         # self.document_structure_att = StructuredAttention(device, self.sem_dim_size, self.doc_hidden_size, bidirectional)
@@ -60,9 +61,11 @@ class DocumentClassificationModel(nn.Module):
 
         #reshape to 3D tensor
         input = input.contiguous().view(input.size(0)*input.size(1), input.size(2), input.size(3))
+        sent_l = list(itertools.chain.from_iterable(sent_l))
+
 
         #BiLSTM
-        encoded_sentences, hidden = self.sentence_encoder.forward(input, sent_l)
+        encoded_sentences, hidden = self.sentence_encoder.forward_packed(input, sent_l)
 #         print("--- %s seconds for BiLSTM ---" % (time.time() - start_time))
         
         mask = tokens_mask.view(tokens_mask.size(0)*tokens_mask.size(1), tokens_mask.size(2)).unsqueeze(2).repeat(1,1,encoded_sentences.size(2))
