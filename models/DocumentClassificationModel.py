@@ -47,7 +47,8 @@ class DocumentClassificationModel(nn.Module):
         start_time = time.time()
         
         batch_size, sent_size, token_size = input['token_idxs'].size()
-        # sent_l = input['sent_l']
+        sent_l = input['sent_l']
+        doc_l = input['doc_l']
 
         tokens_mask = input['mask_tokens']
         sent_mask = input['mask_sents']
@@ -59,7 +60,7 @@ class DocumentClassificationModel(nn.Module):
         input = input.contiguous().view(input.size(0)*input.size(1), input.size(2), input.size(3))
 
         #BiLSTM
-        encoded_sentences, hidden = self.sentence_encoder.forward(input)
+        encoded_sentences, hidden = self.sentence_encoder.forward(input, sent_l)
 #         print("--- %s seconds for BiLSTM ---" % (time.time() - start_time))
         
         
@@ -74,7 +75,7 @@ class DocumentClassificationModel(nn.Module):
 #         print("--- %s seconds for Reshaping and pooling ---" % (time.time() - start_time))
         
         #Doc BiLSTM
-        encoded_documents, hidden = self.document_encoder.forward(encoded_sentences)
+        encoded_documents, hidden = self.document_encoder.forward(encoded_sentences, doc_l)
 #         print("--- %s seconds for BiLSTM for document ---" % (time.time() - start_time))
         #structure Att
         

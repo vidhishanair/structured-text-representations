@@ -18,7 +18,7 @@ def load_data(config):
     train, dev, test, embeddings, vocab = pickle.load(open(config.data_file, 'rb'))
     trainset, devset, testset = DataSet(train), DataSet(dev), DataSet(test)
     vocab = dict([(v['index'],k) for k,v in vocab.items()])
-    trainset.sort(reverse=False)
+    trainset.sort(reverse=True)
     train_batches = trainset.get_batches(config.batch_size, config.epochs, rand=True)
     dev_batches = devset.get_batches(config.batch_size, 1, rand=False)
     test_batches = testset.get_batches(config.batch_size, 1, rand=False)
@@ -56,13 +56,15 @@ def get_feed_dict(batch, device):
         #print("Multi size: "+str(torch.LongTensor(token_idxs_matrix).size()))
         return False, [batch_size * max_doc_l * max_sent_l * max_sent_l / (12 * 200000) + 1]
 
-    if max_doc_l == 1 or max_sent_l == 1 or max_doc_l >40 or max_sent_l>40:
+    if max_doc_l == 1 or max_sent_l == 1 or max_doc_l >30 or max_sent_l>30:
         #print("1 or 60 size: "+str(torch.LongTensor(token_idxs_matrix).size()))
         return False, {}
     feed_dict = {'token_idxs': torch.LongTensor(token_idxs_matrix).to(device),
                  'gold_labels': torch.LongTensor(gold_matrix).to(device),
                  'mask_tokens': torch.FloatTensor(mask_tokens_matrix).to(device),
-                 'mask_sents': torch.FloatTensor(mask_sents_matrix).to(device)}
+                 'mask_sents': torch.FloatTensor(mask_sents_matrix).to(device),
+                 'sent_l': sent_l_matrix,
+                 'doc_l': doc_l_matrix}
     return True, feed_dict
 
 
@@ -173,7 +175,7 @@ parser.add_argument('--word_emsize', type=int, default=300,help='size of word em
 
 parser.add_argument('--dim_str', type=int, default=50,help='size of word embeddings')
 parser.add_argument('--dim_sem', type=int, default=50,help='size of word embeddings')
-parser.add_argument('--dim_output', type=int, default=4,help='size of word embeddings')
+parser.add_argument('--dim_output', type=int, default=5,help='size of word embeddings')
 parser.add_argument('--n_embed', type=int, default=5000,help='size of word embeddings')
 parser.add_argument('--d_embed', type=int, default=5000,help='size of word embeddings')
 parser.add_argument('--dim_hidden', type=int, default=5000,help='size of word embeddings')

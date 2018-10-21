@@ -43,9 +43,9 @@ class DataSet:
         self.num_examples = len(self.data)
 
     def sort(self, reverse=False):
-        random.shuffle(self.data)
-        print(len(self.data))
-        print(self.data[0]._max_sent_len())
+        #random.shuffle(self.data)
+        #print(len(self.data))
+        #print(self.data[0]._max_sent_len())
         self.data = sorted(self.data, key=lambda x: x._max_sent_len(), reverse=reverse)
         self.data = sorted(self.data, key=lambda x: x._doc_len(), reverse=reverse)
 

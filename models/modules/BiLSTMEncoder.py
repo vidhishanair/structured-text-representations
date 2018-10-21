@@ -12,11 +12,15 @@ class BiLSTMEncoder(nn.Module):
         self.bilstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers,
                               batch_first=True, bidirectional=bidirectional, dropout=dropout)
 
-    def forward(self, input):
+    def forward(self, input, seq_len):
         """
         Returns BiLSTM encoded sequence
         :param input: batch*document_size*sent_size*emb_size
         :return: batch*document_size*sent_size*hidden_dim
         """
-        output, hidden = self.bilstm(input)
+        print(seq_len)
+        pack = torch.nn.utils.rnn.pack_padded_sequence(input, seq_len, batch_first=True)
+        output, hidden = self.bilstm(pack)
+        output, unpacked_len = torch.nn.utils.rnn.pad_packed_sequence(output)
+
         return output, hidden
