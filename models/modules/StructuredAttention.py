@@ -12,12 +12,21 @@ class StructuredAttention(nn.Module):
         self.sem_dim_size = sem_dim_size
         self.str_dim_size = sent_hiddent_size - self.sem_dim_size
         self.tp_linear = nn.Linear(self.str_dim_size, self.str_dim_size, bias=True)
+        torch.nn.init.xavier_uniform_(self.tp_linear.weight)
+        nn.init.constant_(self.tp_linear.bias, 0)
         self.tc_linear = nn.Linear(self.str_dim_size, self.str_dim_size, bias=True)
+        torch.nn.init.xavier_uniform_(self.tc_linear.weight)
+        nn.init.constant_(self.tc_linear.bias, 0)
         self.fi_linear = nn.Linear(self.str_dim_size, 1, bias=False)
+        torch.nn.init.xavier_uniform_(self.fi_linear.weight)
         self.bilinear = nn.Bilinear(self.str_dim_size, self.str_dim_size, 1, bias=False)
+        torch.nn.init.xavier_uniform_(self.bilinear.weight)
 
         self.exparam = nn.Parameter(torch.Tensor(1,1,self.sem_dim_size))
+        torch.nn.init.xavier_uniform_(self.exparam)
         self.fzlinear = nn.Linear(3*self.sem_dim_size, self.sem_dim_size, bias=True)
+        torch.nn.init.xavier_uniform_(self.fzlinear.weight)
+        nn.init.constant_(self.fzlinear.bias, 0)
 
     def forward(self, input): #batch*sent * token * hidden
         batch_size, token_size, dim_size = input.size()

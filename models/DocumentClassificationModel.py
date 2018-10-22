@@ -37,9 +37,14 @@ class DocumentClassificationModel(nn.Module):
         #self.document_structure_att = StructuredAttention(device, self.doc_hidden_size//2, self.sem_dim_size//2, bidirectional)
 
         self.pre_lin1 = nn.Linear(self.sem_dim_size, self.sem_dim_size, bias=True)
+        torch.nn.init.xavier_uniform_(self.pre_lin1.weight)
+        nn.init.constant_(self.pre_lin1.bias, 0)
         self.pre_lin2 = nn.Linear(self.sem_dim_size, self.sem_dim_size, bias=True)
-
+        torch.nn.init.xavier_uniform_(self.pre_lin2.weight)
+        nn.init.constant_(self.pre_lin2.bias, 0)
         self.linear_out = nn.Linear(self.sem_dim_size, 5, bias=True)
+        torch.nn.init.xavier_uniform_(self.linear_out.weight)
+        nn.init.constant_(self.linear_out.bias, 0)
 
 
     def forward(self, input):
