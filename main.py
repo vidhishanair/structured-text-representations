@@ -114,7 +114,7 @@ def run(config, device):
 
     model = DocumentClassificationModel(device, config.n_embed, config.d_embed, config.dim_hidden, config.dim_hidden, 1, 1, config.dim_sem, pretrained=embedding_matrix, dropout=config.dropout, bidirectional=True).to(device)
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adagrad(filter(lambda p: p.requires_grad, model.parameters()), lr=config.lr, weight_decay=1e-4)
+    optimizer = optim.Adagrad(filter(lambda p: p.requires_grad, model.parameters()), lr=config.lr, weight_decay=0.01)
 
     
     num_batches_per_epoch = int(num_examples / config.batch_size)
