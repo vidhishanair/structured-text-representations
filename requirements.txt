@@ -1,4 +1,3 @@
-torch
 tqdm
 gensim
 cython
