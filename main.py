@@ -6,13 +6,14 @@ import torch
 import gc
 import argparse
 from models.DocumentClassificationModel import DocumentClassificationModel
+from models.BiDirecModel import BidirectionalModel
 import tqdm
 import torch.optim as optim
 import torch
 import traceback
 import torch.nn as nn
 import torch.nn.functional as F
-
+import math
 
 def load_data(config):
     train, dev, test, embeddings, vocab = pickle.load(open(config.data_file, 'rb'))
@@ -24,7 +25,8 @@ def load_data(config):
     test_batches = testset.get_batches(config.batch_size, 1, rand=False)
     dev_batches = [i for i in dev_batches]
     test_batches = [i for i in test_batches]
-    return len(train), train_batches, dev_batches, test_batches, embeddings, vocab
+    tr_b = [i for i in trainset.get_batches(config.batch_size, config.epochs, rand=True)]
+    return len(train), train_batches, dev_batches, test_batches, embeddings, vocab, tr_b
 
 
 def get_feed_dict(batch, device):
@@ -78,9 +80,11 @@ def evaluate(model, test_batches, device):
         if not value:
             continue
         output = model.forward(feed_dict)
+        print(feed_dict['gold_labels'])
         predictions = output.max(1)[1]
         corr_count += torch.sum(predictions == feed_dict['gold_labels']).item()
-        #print(feed_dict['gold_labels'])
+        print(predictions)
+        #print(corr_count)
         all_count += len(batch)
         count += 1
         del feed_dict['token_idxs']
@@ -104,7 +108,7 @@ def run(config, device):
     ah.setFormatter(formatter)
     logger.addHandler(ah)
 
-    num_examples, train_batches, dev_batches, test_batches, embedding_matrix, vocab = load_data(config)
+    num_examples, train_batches, dev_batches, test_batches, embedding_matrix, vocab, tr_b = load_data(config)
     config.n_embed, config.d_embed = embedding_matrix.shape
 
     config.dim_hidden = config.dim_sem+config.dim_str
@@ -112,9 +116,13 @@ def run(config, device):
     # print(config.__flags)
     # logger.critical(str(config.__flags))
 
-    model = DocumentClassificationModel(device, config.n_embed, config.d_embed, config.dim_hidden, config.dim_hidden, 1, 1, config.dim_sem, pretrained=embedding_matrix, dropout=config.dropout, bidirectional=True).to(device)
+    #model = DocumentClassificationModel(device, config.n_embed, config.d_embed, config.dim_hidden, config.dim_hidden, 1, 1, config.dim_sem, pretrained=embedding_matrix, dropout=config.dropout, bidirectional=True).to(device)
+    model = BidirectionalModel(device, config.n_embed, config.d_embed, config.dim_hidden, config.dim_hidden, 1, 1, config.dim_sem, pretrained=embedding_matrix, dropout=config.dropout, bidirectional=True).to(device)
+
+
+
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adagrad(filter(lambda p: p.requires_grad, model.parameters()), lr=config.lr, weight_decay=1e-4)
+    optimizer = optim.Adagrad(filter(lambda p: p.requires_grad, model.parameters()), lr=config.lr, weight_decay=0.01)
 
     
     num_batches_per_epoch = int(num_examples / config.batch_size)
@@ -124,11 +132,13 @@ def run(config, device):
 
     try:
         for ct, batch in tqdm.tqdm(train_batches, total=num_steps):
-            if ct!= 0 and ct%config.log_period==0 :
+            if count!= 0 and ct!= 0 and ct%config.log_period==0 :
+                print("Trained on {} batches out of {}\n".format(count, config.log_period)) 
+                print('Step: {} Loss: {}\n'.format(ct, total_loss/count))
                 acc_test = evaluate(model, test_batches, device)
                 acc_dev = evaluate(model, dev_batches, device)
-                print("Trained on {} batches out of {}\n".format(count, config.log_period))
-                print('Step: {} Loss: {}\n'.format(ct, total_loss/count))
+                #print("Trained on {} batches out of {}\n".format(count, config.log_period))
+                #print('Step: {} Loss: {}\n'.format(ct, total_loss/count))
                 print('Test ACC: {}\n'.format(acc_test))
                 print('Dev  ACC: {}\n'.format(acc_dev))
                 logger.debug("Trained on {} batches out of {}\n".format(count, config.log_period))
@@ -145,16 +155,24 @@ def run(config, device):
                 continue
             count += 1
             output = model.forward(feed_dict)
+            #if val:
+            #    continue
             target = feed_dict['gold_labels']
             loss = criterion(output, target)
-
+            if math.isnan(loss.item()):
+                print("Skipping nan batch")
+                print(output)
+                exit()
+                continue
             optimizer.zero_grad()
             #print(loss.item())
             loss.backward()
-            #torch.nn.utils.clip_grad_norm(model.parameters(), config.clip)
+            torch.nn.utils.clip_grad_norm(model.parameters(), config.clip)
             optimizer.step()
 
-            print(loss.item())
+            #print(loss.item())
+            #print(feed_dict['gold_labels'])
+            #exit()
             total_loss += loss.item()
             loss = 0
             del feed_dict['token_idxs']
@@ -175,7 +193,7 @@ parser.add_argument('--cuda', action='store_true', default=False, help='use CUDA
 parser.add_argument('--seed', type=int, default=1,help='random seed')
 parser.add_argument('--batch_size', type=int, default=32,help='batchsize')
 parser.add_argument('--lr', type=float, default=0.05,help='learning rate')
-parser.add_argument('--data_file', type=str, default='data/yelp-2013/yelp-2013-all.pkl',help='location of the data corpus')
+parser.add_argument('--data_file', type=str, default='data/yelp-2013/yelp-2013-small.pkl',help='location of the data corpus')
 parser.add_argument('--save_path', type=str, default='./saved_models/english_seed/',help='location of the best model and generated files to save')
 parser.add_argument('--word_emsize', type=int, default=300,help='size of word embeddings')
 

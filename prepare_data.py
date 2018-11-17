@@ -13,7 +13,7 @@ def main(train_path, dev_path, test_path):
     corpus.w2v(options)
 
     instance, instance_dev, instance_test, embeddings, vocab = corpus.prepare(options)
-    pickle.dump((instance, instance_dev, instance_test, embeddings, vocab),open('data/yelp-2013/yelp-2013-all.pkl','wb'))
+    pickle.dump((instance[0:1000], instance_dev[0:200], instance_test[0:200], embeddings, vocab),open('data/yelp-2013/yelp-2013-small.pkl','wb'))
 
 
 parser = argparse.ArgumentParser(description='Process some integers.')

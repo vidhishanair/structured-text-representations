@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
-
+import numpy as np
 
 
 class StructuredAttention(nn.Module):
@@ -11,72 +11,167 @@ class StructuredAttention(nn.Module):
         self.bidirectional = bidirectional
         self.sem_dim_size = sem_dim_size
         self.str_dim_size = sent_hiddent_size - self.sem_dim_size
+        
         self.tp_linear = nn.Linear(self.str_dim_size, self.str_dim_size, bias=True)
         torch.nn.init.xavier_uniform_(self.tp_linear.weight)
         nn.init.constant_(self.tp_linear.bias, 0)
+        
         self.tc_linear = nn.Linear(self.str_dim_size, self.str_dim_size, bias=True)
         torch.nn.init.xavier_uniform_(self.tc_linear.weight)
         nn.init.constant_(self.tc_linear.bias, 0)
+        
         self.fi_linear = nn.Linear(self.str_dim_size, 1, bias=False)
         torch.nn.init.xavier_uniform_(self.fi_linear.weight)
+        
         self.bilinear = nn.Bilinear(self.str_dim_size, self.str_dim_size, 1, bias=False)
         torch.nn.init.xavier_uniform_(self.bilinear.weight)
 
         self.exparam = nn.Parameter(torch.Tensor(1,1,self.sem_dim_size))
         torch.nn.init.xavier_uniform_(self.exparam)
-        self.fzlinear = nn.Linear(3*self.sem_dim_size, self.sem_dim_size, bias=True)
+        
+        self.w_param = nn.Parameter(torch.Tensor(self.sem_dim_size, self.sem_dim_size))
+        torch.nn.init.xavier_uniform_(self.w_param)
+
+        self.w_p = nn.Parameter(torch.Tensor(self.sem_dim_size, self.sem_dim_size))
+        torch.nn.init.xavier_uniform_(self.w_p)
+
+        self.b_p = nn.Parameter(torch.Tensor(self.sem_dim_size))
+        nn.init.constant_(self.b_p, 0)
+
+        self.w_c = nn.Parameter(torch.Tensor(self.sem_dim_size, self.sem_dim_size))
+        torch.nn.init.xavier_uniform_(self.w_c)
+
+        self.b_c = nn.Parameter(torch.Tensor(self.sem_dim_size))
+        nn.init.constant_(self.b_c, 0)
+
+        self.w_i = nn.Parameter(torch.Tensor(self.sem_dim_size, 1))
+        torch.nn.init.xavier_uniform_(self.w_i)
+        
+        self.w_o = nn.Parameter(torch.Tensor(2*self.sem_dim_size, self.sem_dim_size))
+        torch.nn.init.xavier_uniform_(self.w_o)
+
+        self.b_o = nn.Parameter(torch.Tensor(self.sem_dim_size))
+        nn.init.constant_(self.b_o, 0)
+
+        self.fzlinear = nn.Linear(2*self.sem_dim_size, self.sem_dim_size, bias=True)
         torch.nn.init.xavier_uniform_(self.fzlinear.weight)
         nn.init.constant_(self.fzlinear.bias, 0)
+
+    def LReLu(self, x, leak=0.01):
+        f1 = 0.5 * (1 + leak)
+        f2 = 0.5 * (1 - leak)
+        return f1 * x + f2 * torch.abs(x)
 
     def forward(self, input): #batch*sent * token * hidden
         batch_size, token_size, dim_size = input.size()
 
         if(self.bidirectional):
-            input = input.view(batch_size, token_size, 2, dim_size//2)
-            sem_v = torch.cat((input[:,:,0,:self.sem_dim_size//2],input[:,:,1,:self.sem_dim_size//2]),2)
-            str_v = torch.cat((input[:,:,0,self.sem_dim_size//2:],input[:,:,1,self.sem_dim_size//2:]),2)
+            #input = input.view(batch_size, token_size, 2, dim_size//2)
+            #sem_v = torch.cat((input[:,:,0,:self.sem_dim_size//2],input[:,:,1,:self.sem_dim_size//2]),2)
+            #str_v = torch.cat((input[:,:,0,self.sem_dim_size//2:],input[:,:,1,self.sem_dim_size//2:]),2)
+            sem_v = torch.cat([input[:,:,:dim_size//2][:,:,:self.sem_dim_size//2], 
+                          input[:,:,dim_size//2:][:,:,:self.sem_dim_size//2]], dim =2)
+            str_v = torch.cat([input[:,:,:dim_size//2][:,:,self.sem_dim_size//2:],
+                          input[:,:,dim_size//2:][:,:,self.sem_dim_size//2:]], dim =2)
         else:
             sem_v = input[:,:,:self.sem_dim_size]
             str_v = input[:,:,self.sem_dim_size:]
 
-        tp = F.tanh(self.tp_linear(str_v)) # b*s, token, h1
-        tc = F.tanh(self.tc_linear(str_v)) # b*s, token, h1
-        tp = tp.unsqueeze(2).expand(tp.size(0), tp.size(1), tp.size(1), tp.size(2)).contiguous()
-        tc = tc.unsqueeze(2).expand(tc.size(0), tc.size(1), tc.size(1), tc.size(2)).contiguous()
+        #tp = torch.tanh(self.tp_linear(str_v)) # b*s, token, h1
+        tp = torch.bmm(str_v, self.w_p.repeat(batch_size,1,1)) + self.b_p
+        #tc = torch.tanh(self.tc_linear(str_v)) # b*s, token, h1
+        tc = torch.bmm(str_v, self.w_c.repeat(batch_size,1,1)) + self.b_c
+        #tp1 = tp.unsqueeze(2).expand(tp.size(0), tp.size(1), tp.size(1), tp.size(2)).contiguous()
+        #tc1 = tc.unsqueeze(1).expand(tc.size(0), tc.size(1), tc.size(1), tc.size(2)).contiguous()
+        
+        #num_words = token_size
+        #self.att_dim = self.sem_dim_size
+        #tpr = tp.repeat(1,1,num_words).view(batch_size,num_words,num_words,self.att_dim)\
+        #                      .view(batch_size*num_words*num_words,self.att_dim)
+        #tcr = tc.repeat(1,num_words,1).view(batch_size,num_words,num_words,self.att_dim)\
+        #                      .view(batch_size*num_words*num_words,self.att_dim)   
+        #fij = self.bilinear(tpr,tcr).view(batch_size, num_words, num_words)
 
-        f_ij = self.bilinear(tp, tc).squeeze() # b*s, token , token
-        f_i = torch.exp(self.fi_linear(str_v)).squeeze()  # b*s, token
+        #f_ij = self.bilinear(tp1, tc1).squeeze() # b*s, token , token
+        
+        temp = torch.bmm(tp, self.w_param.repeat(batch_size,1,1))
+        f_ij = torch.bmm(temp, tc.transpose(1,2))
+
+        #f_i = torch.exp(self.fi_linear(str_v)).squeeze()  # b*s, token
+        f_i = torch.bmm(str_v, self.w_i.repeat(batch_size,1,1))
+        f_i = torch.exp(f_i).squeeze()
 
         mask = torch.ones(f_ij.size(1), f_ij.size(1)) - torch.eye(f_ij.size(1), f_ij.size(1))
         mask = mask.unsqueeze(0).expand(f_ij.size(0), mask.size(0), mask.size(1)).to(self.device)
         A_ij = torch.exp(f_ij)*mask
-
-        del mask, tp, tc, f_ij
+        if torch.sum(torch.isnan(A_ij))>=1:
+            print("A_ij:")
+            print(A_ij)
+        #del mask, tp, tc, f_ij
 
         tmp = torch.sum(A_ij, dim=1)
         res = torch.zeros(batch_size, token_size, token_size).to(self.device)
-        #tmp = torch.stack([torch.diag(t) for t in tmp])
-        res.as_strided(tmp.size(), [res.stride(0), res.size(2) + 1]).copy_(tmp)
+        res = torch.stack([torch.diag(t) for t in tmp])
+        #res.as_strided(tmp.size(), [res.stride(0), res.size(2) + 1]).copy_(tmp)
         L_ij = -A_ij + res   #A_ij has 0s as diagonals
 
-        del res, tmp
+        #del res, tmp
 
-        L_ij_bar = L_ij
-        L_ij_bar[:,0,:] = f_i
+        #L_ij_bar = L_ij
+        #L_ij_bar[:,0,:] = f_i
+        
+        L_ij_bar = L_ij[:, 1:, :]
+        L_ij_bar = torch.cat([f_i.unsqueeze(1), L_ij_bar], dim=1)
 
         #No batch inverse
-        LLinv = torch.stack([torch.inverse(li) for li in L_ij_bar])
+        try:
+            LLinv = torch.stack([torch.inverse(li) for li in L_ij_bar])
+        except:
+            #print(L_ij_bar)
+            #print(L_ij)
+            #print(A_ij)
+            print(tmp)
+            #print(f_ij)
+            #print(self.w_param)
+            #print(tc)
+            exit()
         #LLinv = b_inv(L_ij_bar, self.device).contiguous()
-
-
-
+        for li in L_ij_bar:
+            if torch.sum(torch.isnan(torch.inverse(li)))>=1:
+                print(li)
+                print(torch.inverse(li))
+                print("numpy inv")
+                print(np.linalg.inv(li.cpu().data.numpy()))
+        if torch.sum(torch.isnan(LLinv))>=1:
+            print("LLinv:")
+            print(LLinv)
         d0 = f_i * LLinv[:,:,0]
-
+        if torch.sum(torch.isnan(f_i))>=1:
+            print("f_i:")
+            print(f_i)
         LLinv_diag = torch.diagonal(LLinv, dim1=-2, dim2=-1).unsqueeze(2)
-
+        if torch.sum(torch.isnan(LLinv_diag))>=1:
+            print("LLinv_diag:")
+            print(LLinv_diag)
         tmp1 = (A_ij.transpose(1,2) * LLinv_diag ).transpose(1,2)
-        tmp2 = A_ij * LLinv_diag.transpose(1,2)
-
+        if torch.sum(torch.isnan(tmp1))>=1:
+            print("wparam")
+            print(self.w_param)
+            print("tp")
+            print(tp)
+            print("tc")
+            print(tc)
+            print("tmp1 results")
+            print("A_IJ")
+            print(A_ij)
+            print("f_ij")
+            print(f_ij)
+            #print(LLinv_diag)
+            print(tmp1)
+        tmp2 = A_ij * LLinv.transpose(1,2)
+        if torch.sum(torch.isnan(tmp2))>=1:
+            print("tmp2:")
+            print(tmp2)
         temp11 = torch.zeros(batch_size, token_size, 1)
         temp21 = torch.zeros(batch_size, 1, token_size)
 
@@ -87,8 +182,10 @@ class StructuredAttention(nn.Module):
         mask2 = torch.cat([temp21,temp22],1).to(self.device)
 
         dx = mask1 * tmp1 - mask2 * tmp2
-
-        del tmp1, tmp2, temp11, temp12, temp21, temp22, mask1, mask2, L_ij_bar, LLinv_diag, A_ij, f_i, LLinv, L_ij
+        if torch.sum(torch.isnan(dx))>=1:
+            print("dx:")
+            print(dx)
+        #del tmp1, tmp2, temp11, temp12, temp21, temp22, mask1, mask2, L_ij_bar, LLinv_diag, A_ij, f_i, LLinv, L_ij
 
         d = torch.cat([d0.unsqueeze(1), dx], dim = 1)
         df = d.transpose(1,2)
@@ -96,12 +193,14 @@ class StructuredAttention(nn.Module):
         ssr = torch.cat([self.exparam.repeat(batch_size,1,1), sem_v], 1)
         pinp = torch.bmm(df, ssr)
 
-        cinp = torch.bmm(dx, sem_v)
+        #cinp = torch.bmm(dx, sem_v)
 
-        finp = torch.cat([sem_v, pinp, cinp],dim = 2)
-        
-        output = F.relu(self.fzlinear(finp))
-
+        finp = torch.cat([sem_v, pinp],dim = 2)
+        if torch.sum(torch.isnan(finp))>=1:
+            print("FINP:")
+            print(finp)
+        #output = self.LReLu(self.fzlinear(finp))
+        output = self.LReLu(torch.bmm(finp, self.w_o.repeat(batch_size,1,1)) + self.b_o)
         return output
 
 def b_inv(b_mat, device):
