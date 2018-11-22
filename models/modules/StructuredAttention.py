@@ -5,25 +5,32 @@ import torch.nn.functional as F
 
 
 class StructuredAttention(nn.Module):
-    def __init__(self, device, sem_dim_size, sent_hiddent_size, bidirectional):
+    def __init__(self, device, sem_dim_size, sent_hiddent_size, bidirectional, py_version):
         super(StructuredAttention, self).__init__()
         self.device = device
         self.bidirectional = bidirectional
         self.sem_dim_size = sem_dim_size
         self.str_dim_size = sent_hiddent_size - self.sem_dim_size
+        self.pytorch_version = py_version
+        print("Setting pytorch "+self.pytorch_version+" version for Structured Attention")
+
         self.tp_linear = nn.Linear(self.str_dim_size, self.str_dim_size, bias=True)
         torch.nn.init.xavier_uniform_(self.tp_linear.weight)
         nn.init.constant_(self.tp_linear.bias, 0)
+
         self.tc_linear = nn.Linear(self.str_dim_size, self.str_dim_size, bias=True)
         torch.nn.init.xavier_uniform_(self.tc_linear.weight)
         nn.init.constant_(self.tc_linear.bias, 0)
+
         self.fi_linear = nn.Linear(self.str_dim_size, 1, bias=False)
         torch.nn.init.xavier_uniform_(self.fi_linear.weight)
+
         self.bilinear = nn.Bilinear(self.str_dim_size, self.str_dim_size, 1, bias=False)
         torch.nn.init.xavier_uniform_(self.bilinear.weight)
 
         self.exparam = nn.Parameter(torch.Tensor(1,1,self.sem_dim_size))
         torch.nn.init.xavier_uniform_(self.exparam)
+
         self.fzlinear = nn.Linear(3*self.sem_dim_size, self.sem_dim_size, bias=True)
         torch.nn.init.xavier_uniform_(self.fzlinear.weight)
         nn.init.constant_(self.fzlinear.bias, 0)
@@ -51,7 +58,6 @@ class StructuredAttention(nn.Module):
         mask = mask.unsqueeze(0).expand(f_ij.size(0), mask.size(0), mask.size(1)).to(self.device)
         A_ij = torch.exp(f_ij)*mask
 
-        #del mask, tp, tc, f_ij
 
         tmp = torch.sum(A_ij, dim=1)
         res = torch.zeros(batch_size, token_size, token_size).to(self.device)
@@ -59,17 +65,16 @@ class StructuredAttention(nn.Module):
         res.as_strided(tmp.size(), [res.stride(0), res.size(2) + 1]).copy_(tmp)
         L_ij = -A_ij + res   #A_ij has 0s as diagonals
 
-        #del res, tmp
-
         L_ij_bar = L_ij
         L_ij_bar[:,0,:] = f_i
 
         #No batch inverse
         #LLinv = torch.stack([torch.inverse(li) for li in L_ij_bar])
-        LLinv = torch.inverse(L_ij_bar)
-        #LLinv = b_inv(L_ij_bar, self.device).contiguous()
-
-
+        LLinv = None
+        if self.pytorch_version == 'nightly':
+            LLinv = torch.inverse(L_ij_bar)
+        else:
+            LLinv = torch.stack([torch.inverse(li) for li in L_ij_bar])
 
         d0 = f_i * LLinv[:,:,0]
 
@@ -89,8 +94,6 @@ class StructuredAttention(nn.Module):
 
         dx = mask1 * tmp1 - mask2 * tmp2
 
-        #del tmp1, tmp2, temp11, temp12, temp21, temp22, mask1, mask2, L_ij_bar, LLinv_diag, A_ij, f_i, LLinv, L_ij
-
         d = torch.cat([d0.unsqueeze(1), dx], dim = 1)
         df = d.transpose(1,2)
 
@@ -103,13 +106,9 @@ class StructuredAttention(nn.Module):
         
         output = F.relu(self.fzlinear(finp))
 
-        return output
+        return output, df
 
 def b_inv(b_mat, device):
-    #eye = b_mat.new_ones(b_mat.size(-1)).diag().expand_as(b_mat).to(device)
-    # eye = torch.eye(b_mat.size(1), b_mat.size(2)).unsqueeze(0).expand(b_mat.size(0), b_mat.size(1), b_mat.size(2)).to(self.device)
     eye = torch.rand(b_mat.size(0), b_mat.size(1), b_mat.size(2)).to(device)
-    #b_inv = torch.rand(b_mat.size(0), b_mat.size(1), b_mat.size(2)).to(device)
     b_inv, _ = torch.gesv(eye, b_mat)
-    del eye
     return b_inv
