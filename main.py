@@ -1,12 +1,13 @@
 from data_reader import DataSet
 import numpy as np
+import os
 import pickle
 import logging
 import torch
 import gc
 import argparse
 from models.DocumentClassificationModel import DocumentClassificationModel
-from models.BiDirecModel import BidirectionalModel
+from dependency_decoding import chu_liu_edmonds
 import tqdm
 import torch.optim as optim
 import torch
@@ -55,18 +56,8 @@ def get_feed_dict(batch, device):
     mask_parser_2 = np.ones([batch_size, max_doc_l, max_doc_l], np.float32)
     mask_parser_1[:, :, 0] = 0
     mask_parser_2[:, 0, :] = 0
-    # if (batch_size * max_doc_l * max_sent_l * max_sent_l > 16 * 200000):
-        #print("Multi size: "+str(torch.LongTensor(token_idxs_matrix).size()))
-    #    return False, [batch_size * max_doc_l * max_sent_l * max_sent_l / (16 * 200000) + 1]
-
-    #print(max_doc_l)
-    #print(max_sent_l)
-    #print("S")
-    if max_doc_l == 1 or max_sent_l == 1 or max_doc_l >50 or max_sent_l>30:
-        #print("1 or 60 size: "+str(torch.LongTensor(token_idxs_matrix).size()))
+    if max_doc_l == 1 or max_sent_l == 1 or max_doc_l >30 or max_sent_l>30:
         return False, {}
-    #print(max_doc_l)
-    #print(max_sent_l)
     try:
         feed_dict = {'token_idxs': torch.LongTensor(token_idxs_matrix).to(device),
                  'gold_labels': torch.LongTensor(gold_matrix).to(device),
@@ -75,7 +66,6 @@ def get_feed_dict(batch, device):
                  'sent_l': sent_l_matrix,
                  'doc_l': doc_l_matrix}
     except:
-        print("Here")
         return False, [batch_size * max_doc_l * max_sent_l * max_sent_l / (16 * 200000) + 1]
     return True, feed_dict
 
@@ -90,11 +80,10 @@ def evaluate(model, test_batches, device, criterion):
         value, feed_dict = get_feed_dict(batch, device) # batch = [Instances], feed_dict = {inputs}
         if not value:
             continue
-        output = model.forward(feed_dict)
+        output, sent_attention_matrix, doc_attention_matrix = model.forward(feed_dict)
         total_loss = criterion(output, feed_dict['gold_labels']).item()
         predictions = output.max(1)[1]
         corr_count += torch.sum(predictions == feed_dict['gold_labels']).item()
-        #print(feed_dict['gold_labels'])
         all_count += len(batch)
         count += 1
         del feed_dict['token_idxs']
@@ -106,14 +95,77 @@ def evaluate(model, test_batches, device, criterion):
     acc_test = 1.0 * corr_count / all_count
     return acc_test
 
+def extract_structures(model, test_batches, device, vocab, dirName):
+    model.eval()
+    dirName = dirName+"/structures"
+    if not os.path.exists(dirName):
+        os.mkdir(dirName)
+        print("Directory " , dirName ,  " Created ")
+    for ct, batch in test_batches:
+        value, feed_dict = get_feed_dict(batch, device)
+        if not value:
+            continue
+        output, sent_attention_matrix, doc_attention_matrix = model.forward(feed_dict)
+
+        for i in range(len(batch)):
+            fileName = dirName+"/"+str(i)+".txt"
+            fp = open(fileName, "w")
+            print("\nDoc: "+str(i)+"\n")
+            fp.write("Doc: "+str(i)+"\n")
+
+            l = len(batch[i].token_idxs)
+            sent_no = 0
+            for sent in batch[i].token_idxs:
+                printstr = ''
+                #scores = str_scores_sent[sent_no][0:l, 0:l]
+                token_count = 0
+                for token in sent:
+                    printstr += vocab[token]+" "
+                    token_count = token_count + 1
+                print(printstr)
+                fp.write(printstr+"\n")
+
+                scores = sent_attention_matrix[sent_no][0:token_count, 0:token_count]
+                shape2 = sent_attention_matrix[sent_no][0:token_count,0:token_count].size()
+                row = torch.ones([1, shape2[1]+1])
+                column = torch.zeros([shape2[0], 1])
+                new_scores = torch.concat([column, scores], 1)
+                new_scores = torch.concat([row, new_scores], 0)
+                heads, tree_score = chu_liu_edmonds(new_scores.data.cpu().numpy())
+                print(heads, tree_score)
+                fp.write(heads+" ")
+                fp.write(tree_score)
+
+            shape2 = doc_attention_matrix[i][0:l,0:l].size()
+            row = torch.ones([1, shape2[1]+1])
+            column = torch.zeros([shape2[0], 1])
+            scores = doc_attention_matrix[i][0:l, 0:l]
+            new_scores = torch.concat([column, scores], 1)
+            new_scores = torch.concat([row, new_scores], 0)
+            heads, tree_score = chu_liu_edmonds(new_scores.data.cpu().numpy())
+            print(heads, tree_score)
+            fp.write("\n")
+            fp.write(heads+" ")
+            fp.write(tree_score)
+            fp.close()
+
+
 
 def run(config, device):
     import random
 
     hash = random.getrandbits(32)
+    dirName = "saved_models/"+str(hash)
+    if not os.path.exists(dirName):
+        os.mkdir(dirName)
+        print("Directory " , dirName ,  " Created ")
+    else:
+        print("Directory " , dirName ,  " already exists")
+        exit()
+    save_path = dirName+"/best_model.pth"
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
-    ah = logging.FileHandler('logs/'+str(hash)+'.log')
+    ah = logging.FileHandler(dirName+"/"+str(hash)+'.log')
     ah.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(asctime)s - %(message)s')
     ah.setFormatter(formatter)
@@ -124,11 +176,9 @@ def run(config, device):
 
     config.dim_hidden = config.dim_sem+config.dim_str
 
-    # print(config.__flags)
-    # logger.critical(str(config.__flags))
+    print(config)
 
-    #model = DocumentClassificationModel(device, config.n_embed, config.d_embed, config.dim_hidden, config.dim_hidden, 1, 1, config.dim_sem, pretrained=embedding_matrix, dropout=config.dropout, bidirectional=True).to(device)
-    model = BidirectionalModel(device, config.n_embed, config.d_embed, config.dim_hidden, config.dim_hidden, 1, 1, config.dim_sem, pretrained=embedding_matrix, dropout=config.dropout, bidirectional=True).to(device)
+    model = DocumentClassificationModel(device, config.n_embed, config.d_embed, config.dim_hidden, config.dim_hidden, 1, 1, config.dim_sem, pretrained=embedding_matrix, dropout=config.dropout, bidirectional=True, py_version=config.pytorch_version).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adagrad(filter(lambda p: p.requires_grad, model.parameters()), lr=config.lr, weight_decay=0.01)
 
@@ -141,17 +191,17 @@ def run(config, device):
     try:
         for ct, batch in tqdm.tqdm(train_batches, total=num_steps):
             if ct!= 0 and ct%config.log_period==0 :
-                acc_test = evaluate(model, test_batches, device, criterion)
+                #acc_test = evaluate(model, test_batches, device, criterion)
                 acc_dev = evaluate(model, dev_batches, device, criterion)
                 if acc_dev > best_val:
+                    with open(save_path, 'wb') as f:
+                        torch.save(model, f)
                     best_val = acc_dev
                 print("Trained on {} batches out of {}\n".format(count, config.log_period))
                 print('Step: {} Loss: {}\n'.format(ct, total_loss/count))
-                print('Test ACC: {}\n'.format(acc_test))
                 print('Dev  ACC: {}\n'.format(acc_dev))
                 logger.debug("Trained on {} batches out of {}\n".format(count, config.log_period))
                 logger.debug('Step: {} Loss: {}\n'.format(ct, total_loss/count))
-                logger.debug('Test ACC: {}\n'.format(acc_test))
                 logger.debug('Dev  ACC: {}\n'.format(acc_dev))
                 print("Best Dev: " + str(best_val))
                 logger.handlers[0].flush()
@@ -163,23 +213,23 @@ def run(config, device):
             if not value:
                 continue
             count += 1
-            output = model.forward(feed_dict)
+            output, sent_attention_matrix, doc_attention_matrix = model.forward(feed_dict)
             target = feed_dict['gold_labels']
             loss = criterion(output, target)
 
             optimizer.zero_grad()
-            #print(loss.item())
             loss.backward()
             torch.nn.utils.clip_grad_norm(model.parameters(), config.clip)
             optimizer.step()
 
-            #print(loss.item())
             total_loss += loss.item()
             loss = 0
             del feed_dict['token_idxs']
             del feed_dict['gold_labels']
             torch.cuda.empty_cache()
-
+    except KeyboardInterrupt:
+        print('-' * 89)
+        print('Exiting from training early')
     except Exception as e:
         print(e)
         traceback.print_exc()
@@ -188,28 +238,41 @@ def run(config, device):
             if torch.is_tensor(obj):
                 #print("GC: "+str(type(obj))+" "+str(obj.size()))
                 pass
+        exit()
+    with open(save_path, 'rb') as f:
+        model = torch.load(f)
+    # after load the rnn params are not a continuous chunk of memory
+    # this makes them a continuous chunk, and will speed up forward pass
+    model.sentence_encoder.flatten_parameters()
+    model.document_encoder.flatten_parameters()
+    acc_test = evaluate(model, test_batches, device, criterion)
+    print('Test ACC: {}\n'.format(acc_test))
+    logger.debug('Test ACC: {}\n'.format(acc_test))
+    extract_structures(model, test_batches, device, vocab, dirName)
 
-parser = argparse.ArgumentParser(description='PyTorch Definition Generation Model')
+
+
+
+parser = argparse.ArgumentParser(description='PyTorch Structured Attention Model')
 parser.add_argument('--cuda', action='store_true', default=False, help='use CUDA')
 parser.add_argument('--seed', type=int, default=1,help='random seed')
-parser.add_argument('--batch_size', type=int, default=32,help='batchsize')
+parser.add_argument('--batch_size', type=int, default=8,help='batchsize')
 parser.add_argument('--lr', type=float, default=0.05,help='learning rate')
+parser.add_argument('--pytorch_version', type=str, default='nightly',help='location of the data corpus')
 parser.add_argument('--data_file', type=str, default='data/yelp-2013/yelp-2013-all.pkl',help='location of the data corpus')
-parser.add_argument('--save_path', type=str, default='./saved_models/english_seed/',help='location of the best model and generated files to save')
+parser.add_argument('--save_path', type=str, default='./saved_models/best_model.pth',help='location of the best model and generated files to save')
 parser.add_argument('--word_emsize', type=int, default=300,help='size of word embeddings')
 
 parser.add_argument('--dim_str', type=int, default=50,help='size of word embeddings')
 parser.add_argument('--dim_sem', type=int, default=50,help='size of word embeddings')
 parser.add_argument('--dim_output', type=int, default=5,help='size of word embeddings')
-parser.add_argument('--n_embed', type=int, default=5000,help='size of word embeddings')
-parser.add_argument('--d_embed', type=int, default=5000,help='size of word embeddings')
-parser.add_argument('--dim_hidden', type=int, default=5000,help='size of word embeddings')
+parser.add_argument('--n_embed', type=int, default=49030,help='size of word embeddings')
+parser.add_argument('--d_embed', type=int, default=200,help='size of word embeddings')
 
 parser.add_argument('--nlayers', type=int, default=1,help='number of layers')
-parser.add_argument('--nhid', type=int, default=300,help='number of hidden units per layer')
 parser.add_argument('--dropout', type=float, default=0.2,help='dropout applied to layers (0 = no dropout)')
 parser.add_argument('--clip', type=float, default=5,help='gradient clip')
-parser.add_argument('--log_period', type=float, default=500,help='log interval')
+parser.add_argument('--log_period', type=float, default=100,help='log interval')
 parser.add_argument('--epochs', type=int, default=50,help='epochs')
 
 args = parser.parse_args()
@@ -219,15 +282,12 @@ dropout = args.dropout
 seed = args.seed
 num_layers = args.nlayers
 word_emb_size = args.word_emsize
-hidden_size = args.nhid
 data_path = args.data_file
 save_path = args.save_path
 lr = args.lr
 clip = args.clip
 log_period = args.log_period
 
-model_save_path = save_path + "best_model.pth"
-plot_save_path = save_path + "loss.png"
 
 torch.manual_seed(seed)
 if torch.cuda.is_available():
