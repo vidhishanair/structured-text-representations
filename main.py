@@ -62,7 +62,7 @@ def get_feed_dict(batch, device):
     #print(max_doc_l)
     #print(max_sent_l)
     #print("S")
-    if max_doc_l == 1 or max_sent_l == 1 or max_doc_l >30 or max_sent_l>30:
+    if max_doc_l == 1 or max_sent_l == 1 or max_doc_l >50 or max_sent_l>50:
         #print("1 or 60 size: "+str(torch.LongTensor(token_idxs_matrix).size()))
         return False, {}
     #print(max_doc_l)
@@ -170,7 +170,7 @@ def run(config, device):
             optimizer.zero_grad()
             #print(loss.item())
             loss.backward()
-            #torch.nn.utils.clip_grad_norm(model.parameters(), config.clip)
+            torch.nn.utils.clip_grad_norm(model.parameters(), config.clip)
             optimizer.step()
 
             #print(loss.item())
