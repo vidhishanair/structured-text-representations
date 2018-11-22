@@ -20,7 +20,7 @@ def load_data(config):
     trainset, devset, testset = DataSet(train), DataSet(dev), DataSet(test)
     vocab = dict([(v['index'],k) for k,v in vocab.items()])
     trainset.sort(reverse=False)
-    train_batches = trainset.get_batches(config.batch_size, config.epochs, rand=False)
+    train_batches = trainset.get_batches(config.batch_size, config.epochs, rand=True)
     dev_batches = devset.get_batches(config.batch_size, 1, rand=False)
     test_batches = testset.get_batches(config.batch_size, 1, rand=False)
     temp_train = trainset.get_batches(config.batch_size, config.epochs, rand=True)
@@ -62,7 +62,7 @@ def get_feed_dict(batch, device):
     #print(max_doc_l)
     #print(max_sent_l)
     #print("S")
-    if max_doc_l == 1 or max_sent_l == 1 or max_doc_l >50 or max_sent_l>50:
+    if max_doc_l == 1 or max_sent_l == 1 or max_doc_l >50 or max_sent_l>30:
         #print("1 or 60 size: "+str(torch.LongTensor(token_idxs_matrix).size()))
         return False, {}
     #print(max_doc_l)
