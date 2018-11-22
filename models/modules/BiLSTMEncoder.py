@@ -39,7 +39,8 @@ class BiLSTMEncoder(nn.Module):
 
         # Handling padding in Recurrent Networks
         #print(seq_len)
-        sent_packed = nn.utils.rnn.pack_padded_sequence(sent_variable, sent_len, batch_first=True)
+        #print(sent_len)
+        sent_packed = nn.utils.rnn.pack_padded_sequence(sent_variable, sent_len.copy(), batch_first=True)
         sent_output, hidden = self.bilstm(sent_packed)
         sent_output = nn.utils.rnn.pad_packed_sequence(sent_output, batch_first=True)[0]
 

@@ -6,6 +6,7 @@ import torch
 import gc
 import argparse
 from models.DocumentClassificationModel import DocumentClassificationModel
+from models.BiDirecModel import BidirectionalModel
 import tqdm
 import torch.optim as optim
 import torch
@@ -19,12 +20,14 @@ def load_data(config):
     trainset, devset, testset = DataSet(train), DataSet(dev), DataSet(test)
     vocab = dict([(v['index'],k) for k,v in vocab.items()])
     trainset.sort(reverse=False)
-    train_batches = trainset.get_batches(config.batch_size, config.epochs, rand=True)
+    train_batches = trainset.get_batches(config.batch_size, config.epochs, rand=False)
     dev_batches = devset.get_batches(config.batch_size, 1, rand=False)
     test_batches = testset.get_batches(config.batch_size, 1, rand=False)
+    temp_train = trainset.get_batches(config.batch_size, config.epochs, rand=True)
     dev_batches = [i for i in dev_batches]
     test_batches = [i for i in test_batches]
-    return len(train), train_batches, dev_batches, test_batches, embeddings, vocab
+    temp_train = [i for i in temp_train]
+    return len(train), train_batches, dev_batches, test_batches, embeddings, vocab, temp_train
 
 
 def get_feed_dict(batch, device):
@@ -52,32 +55,43 @@ def get_feed_dict(batch, device):
     mask_parser_2 = np.ones([batch_size, max_doc_l, max_doc_l], np.float32)
     mask_parser_1[:, :, 0] = 0
     mask_parser_2[:, 0, :] = 0
-    if (batch_size * max_doc_l * max_sent_l * max_sent_l > 12 * 90000):
+    # if (batch_size * max_doc_l * max_sent_l * max_sent_l > 16 * 200000):
         #print("Multi size: "+str(torch.LongTensor(token_idxs_matrix).size()))
-        return False, [batch_size * max_doc_l * max_sent_l * max_sent_l / (12 * 200000) + 1]
+    #    return False, [batch_size * max_doc_l * max_sent_l * max_sent_l / (16 * 200000) + 1]
 
+    #print(max_doc_l)
+    #print(max_sent_l)
+    #print("S")
     if max_doc_l == 1 or max_sent_l == 1 or max_doc_l >30 or max_sent_l>30:
         #print("1 or 60 size: "+str(torch.LongTensor(token_idxs_matrix).size()))
         return False, {}
-    feed_dict = {'token_idxs': torch.LongTensor(token_idxs_matrix).to(device),
+    #print(max_doc_l)
+    #print(max_sent_l)
+    try:
+        feed_dict = {'token_idxs': torch.LongTensor(token_idxs_matrix).to(device),
                  'gold_labels': torch.LongTensor(gold_matrix).to(device),
                  'mask_tokens': torch.FloatTensor(mask_tokens_matrix).to(device),
                  'mask_sents': torch.FloatTensor(mask_sents_matrix).to(device),
                  'sent_l': sent_l_matrix,
                  'doc_l': doc_l_matrix}
+    except:
+        print("Here")
+        return False, [batch_size * max_doc_l * max_sent_l * max_sent_l / (16 * 200000) + 1]
     return True, feed_dict
 
 
-def evaluate(model, test_batches, device):
+def evaluate(model, test_batches, device, criterion):
     corr_count, all_count = 0, 0
     model.eval()
     count = 0
+    total_loss = 0
     for ct, batch in test_batches:
         #print("Batch : "+str(count))
         value, feed_dict = get_feed_dict(batch, device) # batch = [Instances], feed_dict = {inputs}
         if not value:
             continue
         output = model.forward(feed_dict)
+        total_loss = criterion(output, feed_dict['gold_labels']).item()
         predictions = output.max(1)[1]
         corr_count += torch.sum(predictions == feed_dict['gold_labels']).item()
         #print(feed_dict['gold_labels'])
@@ -88,6 +102,7 @@ def evaluate(model, test_batches, device):
         del feed_dict
         torch.cuda.empty_cache()
     print(corr_count, all_count)
+    #print("Test Loss: "+str(total_loss/count))
     acc_test = 1.0 * corr_count / all_count
     return acc_test
 
@@ -104,7 +119,7 @@ def run(config, device):
     ah.setFormatter(formatter)
     logger.addHandler(ah)
 
-    num_examples, train_batches, dev_batches, test_batches, embedding_matrix, vocab = load_data(config)
+    num_examples, train_batches, dev_batches, test_batches, embedding_matrix, vocab, temp_train = load_data(config)
     config.n_embed, config.d_embed = embedding_matrix.shape
 
     config.dim_hidden = config.dim_sem+config.dim_str
@@ -112,7 +127,8 @@ def run(config, device):
     # print(config.__flags)
     # logger.critical(str(config.__flags))
 
-    model = DocumentClassificationModel(device, config.n_embed, config.d_embed, config.dim_hidden, config.dim_hidden, 1, 1, config.dim_sem, pretrained=embedding_matrix, dropout=config.dropout, bidirectional=True).to(device)
+    #model = DocumentClassificationModel(device, config.n_embed, config.d_embed, config.dim_hidden, config.dim_hidden, 1, 1, config.dim_sem, pretrained=embedding_matrix, dropout=config.dropout, bidirectional=True).to(device)
+    model = BidirectionalModel(device, config.n_embed, config.d_embed, config.dim_hidden, config.dim_hidden, 1, 1, config.dim_sem, pretrained=embedding_matrix, dropout=config.dropout, bidirectional=True).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adagrad(filter(lambda p: p.requires_grad, model.parameters()), lr=config.lr, weight_decay=0.01)
 
@@ -121,12 +137,14 @@ def run(config, device):
     num_steps = config.epochs * num_batches_per_epoch
     total_loss = 0
     count = 0
-
+    best_val = 0
     try:
         for ct, batch in tqdm.tqdm(train_batches, total=num_steps):
             if ct!= 0 and ct%config.log_period==0 :
-                acc_test = evaluate(model, test_batches, device)
-                acc_dev = evaluate(model, dev_batches, device)
+                acc_test = evaluate(model, test_batches, device, criterion)
+                acc_dev = evaluate(model, dev_batches, device, criterion)
+                if acc_dev > best_val:
+                    best_val = acc_dev
                 print("Trained on {} batches out of {}\n".format(count, config.log_period))
                 print('Step: {} Loss: {}\n'.format(ct, total_loss/count))
                 print('Test ACC: {}\n'.format(acc_test))
@@ -135,6 +153,7 @@ def run(config, device):
                 logger.debug('Step: {} Loss: {}\n'.format(ct, total_loss/count))
                 logger.debug('Test ACC: {}\n'.format(acc_test))
                 logger.debug('Dev  ACC: {}\n'.format(acc_dev))
+                print("Best Dev: " + str(best_val))
                 logger.handlers[0].flush()
                 total_loss = 0
                 count = 0
@@ -154,7 +173,7 @@ def run(config, device):
             #torch.nn.utils.clip_grad_norm(model.parameters(), config.clip)
             optimizer.step()
 
-            print(loss.item())
+            #print(loss.item())
             total_loss += loss.item()
             loss = 0
             del feed_dict['token_idxs']
@@ -167,8 +186,8 @@ def run(config, device):
         torch.cuda.empty_cache()
         for obj in gc.get_objects():
             if torch.is_tensor(obj):
-                print("GC: "+str(type(obj))+" "+str(obj.size()))
-
+                #print("GC: "+str(type(obj))+" "+str(obj.size()))
+                pass
 
 parser = argparse.ArgumentParser(description='PyTorch Definition Generation Model')
 parser.add_argument('--cuda', action='store_true', default=False, help='use CUDA')

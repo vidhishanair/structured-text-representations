@@ -51,7 +51,7 @@ class StructuredAttention(nn.Module):
         mask = mask.unsqueeze(0).expand(f_ij.size(0), mask.size(0), mask.size(1)).to(self.device)
         A_ij = torch.exp(f_ij)*mask
 
-        del mask, tp, tc, f_ij
+        #del mask, tp, tc, f_ij
 
         tmp = torch.sum(A_ij, dim=1)
         res = torch.zeros(batch_size, token_size, token_size).to(self.device)
@@ -59,13 +59,13 @@ class StructuredAttention(nn.Module):
         res.as_strided(tmp.size(), [res.stride(0), res.size(2) + 1]).copy_(tmp)
         L_ij = -A_ij + res   #A_ij has 0s as diagonals
 
-        del res, tmp
+        #del res, tmp
 
         L_ij_bar = L_ij
         L_ij_bar[:,0,:] = f_i
 
         #No batch inverse
-        # LLinv = torch.stack([torch.inverse(li) for li in L_ij_bar])
+        #LLinv = torch.stack([torch.inverse(li) for li in L_ij_bar])
         LLinv = torch.inverse(L_ij_bar)
         #LLinv = b_inv(L_ij_bar, self.device).contiguous()
 
@@ -89,7 +89,7 @@ class StructuredAttention(nn.Module):
 
         dx = mask1 * tmp1 - mask2 * tmp2
 
-        del tmp1, tmp2, temp11, temp12, temp21, temp22, mask1, mask2, L_ij_bar, LLinv_diag, A_ij, f_i, LLinv, L_ij
+        #del tmp1, tmp2, temp11, temp12, temp21, temp22, mask1, mask2, L_ij_bar, LLinv_diag, A_ij, f_i, LLinv, L_ij
 
         d = torch.cat([d0.unsqueeze(1), dx], dim = 1)
         df = d.transpose(1,2)
