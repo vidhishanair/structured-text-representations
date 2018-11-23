@@ -9,4 +9,5 @@ This code by default requires Pytorch Nightly version (For batched inverse)
 To run with Pytorch stabe use --pytorch_version stable
 
 Dependencies are listed in requirements.txt
+Create dir saved_models before running
 
