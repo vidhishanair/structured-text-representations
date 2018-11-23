@@ -105,10 +105,10 @@ class DocumentClassificationModel(nn.Module):
         #Max Pool
         encoded_documents = encoded_documents + ((sent_mask-1)*999).unsqueeze(2).repeat(1,1,encoded_documents.size(2))
         encoded_documents = encoded_documents.max(dim=1)[0]
-        encoded_documents = self.drop(encoded_documents)
-        encoded_documents = F.relu(self.pre_lin1(encoded_documents))
-        encoded_documents = self.drop(encoded_documents)
-        encoded_documents = F.relu(self.pre_lin2(encoded_documents))
+        #encoded_documents = self.drop(encoded_documents)
+        #encoded_documents = F.relu(self.pre_lin1(encoded_documents))
+        #encoded_documents = self.drop(encoded_documents)
+        #encoded_documents = F.relu(self.pre_lin2(encoded_documents))
         #Linear for output
         output = self.linear_out(encoded_documents)
         

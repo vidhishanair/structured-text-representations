@@ -21,7 +21,7 @@ def load_data(config):
     trainset, devset, testset = DataSet(train), DataSet(dev), DataSet(test)
     vocab = dict([(v['index'],k) for k,v in vocab.items()])
     trainset.sort(reverse=False)
-    train_batches = trainset.get_batches(config.batch_size, config.epochs, rand=True)
+    train_batches = trainset.get_batches(config.batch_size, config.epochs, rand=False)
     dev_batches = devset.get_batches(config.batch_size, 1, rand=False)
     test_batches = testset.get_batches(config.batch_size, 1, rand=False)
     temp_train = trainset.get_batches(config.batch_size, config.epochs, rand=True)
@@ -101,6 +101,7 @@ def extract_structures(model, test_batches, device, vocab, dirName):
     if not os.path.exists(dirName):
         os.mkdir(dirName)
         print("Directory " , dirName ,  " Created ")
+    count=0
     for ct, batch in test_batches:
         value, feed_dict = get_feed_dict(batch, device)
         if not value:
@@ -108,10 +109,11 @@ def extract_structures(model, test_batches, device, vocab, dirName):
         output, sent_attention_matrix, doc_attention_matrix = model.forward(feed_dict)
 
         for i in range(len(batch)):
-            fileName = dirName+"/"+str(i)+".txt"
+            fileName = dirName+"/"+str(count)+".txt"
+            count += 1
             fp = open(fileName, "w")
-            print("\nDoc: "+str(i)+"\n")
-            fp.write("Doc: "+str(i)+"\n")
+            #print("\nDoc: "+str(count)+"\n")
+            fp.write("Doc: "+str(count)+"\n")
 
             l = len(batch[i].token_idxs)
             sent_no = 0
@@ -122,31 +124,31 @@ def extract_structures(model, test_batches, device, vocab, dirName):
                 for token in sent:
                     printstr += vocab[token]+" "
                     token_count = token_count + 1
-                print(printstr)
+                #print(printstr)
                 fp.write(printstr+"\n")
 
                 scores = sent_attention_matrix[sent_no][0:token_count, 0:token_count]
                 shape2 = sent_attention_matrix[sent_no][0:token_count,0:token_count].size()
-                row = torch.ones([1, shape2[1]+1])
-                column = torch.zeros([shape2[0], 1])
-                new_scores = torch.concat([column, scores], 1)
-                new_scores = torch.concat([row, new_scores], 0)
-                heads, tree_score = chu_liu_edmonds(new_scores.data.cpu().numpy())
-                print(heads, tree_score)
-                fp.write(heads+" ")
-                fp.write(tree_score)
+                row = torch.ones([1, shape2[1]+1]).to(device)
+                column = torch.zeros([shape2[0], 1]).to(device)
+                new_scores = torch.cat([column, scores], dim=1)
+                new_scores = torch.cat([row, new_scores], dim=0)
+                heads, tree_score = chu_liu_edmonds(new_scores.data.cpu().numpy().astype(np.float64))
+                #print(heads, tree_score)
+                fp.write(str(heads)+" ")
+                fp.write(str(tree_score)+"\n")
 
             shape2 = doc_attention_matrix[i][0:l,0:l].size()
-            row = torch.ones([1, shape2[1]+1])
-            column = torch.zeros([shape2[0], 1])
+            row = torch.ones([1, shape2[1]+1]).to(device)
+            column = torch.zeros([shape2[0], 1]).to(device)
             scores = doc_attention_matrix[i][0:l, 0:l]
-            new_scores = torch.concat([column, scores], 1)
-            new_scores = torch.concat([row, new_scores], 0)
-            heads, tree_score = chu_liu_edmonds(new_scores.data.cpu().numpy())
-            print(heads, tree_score)
+            new_scores = torch.cat([column, scores], dim=1)
+            new_scores = torch.cat([row, new_scores], dim=0)
+            heads, tree_score = chu_liu_edmonds(new_scores.data.cpu().numpy().astype(np.float64))
+            #print(heads, tree_score)
             fp.write("\n")
-            fp.write(heads+" ")
-            fp.write(tree_score)
+            fp.write(str(heads)+" ")
+            fp.write(str(tree_score)+"\n")
             fp.close()
 
 
@@ -243,8 +245,8 @@ def run(config, device):
         model = torch.load(f)
     # after load the rnn params are not a continuous chunk of memory
     # this makes them a continuous chunk, and will speed up forward pass
-    model.sentence_encoder.flatten_parameters()
-    model.document_encoder.flatten_parameters()
+    model.sentence_encoder.bilstm.flatten_parameters()
+    model.document_encoder.bilstm.flatten_parameters()
     acc_test = evaluate(model, test_batches, device, criterion)
     print('Test ACC: {}\n'.format(acc_test))
     logger.debug('Test ACC: {}\n'.format(acc_test))
