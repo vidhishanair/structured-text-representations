@@ -1,3 +1,4 @@
 tqdm
 gensim
 cython
+git+https://github.com/andersjo/dependency_decoding
