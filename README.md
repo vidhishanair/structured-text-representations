@@ -1,5 +1,9 @@
 # stuctured-text-representations
-Pytorch implementation of : "Learning Structured Text Representations" : https://www.mitpressjournals.org/doi/pdfplus/10.1162/tacl_a_00005
+
+Pytorch implementation of : 
+[Learning Structured Text Representations](https://arxiv.org/abs/1705.09207)  
+Yang Liu and Mirella Lapata,
+Accepted by TACL
 
 1. Dataset Instructions : https://github.com/nlpyang/structured
 2. Pre-processing code has been borrowed from : https://github.com/nlpyang/structured
