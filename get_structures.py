@@ -138,7 +138,8 @@ def extract_structures(model, test_batches, device, vocab, dirName):
                 fp.write(str(heads)+" ")
                 fp.write(str(tree_score)+"\n")
 
-            doc_attention_matrix = doc_attention_matrix[:,:,1:]
+            #doc_attention_matrix = doc_attention_matrix[:,:,1:]
+            #print(doc_attention_matrix.size())
             shape2 = doc_attention_matrix[i][0:l,0:l].size()
             row = torch.ones([1, shape2[1]+1]).to(device)
             column = torch.zeros([shape2[0], 1]).to(device)
@@ -210,7 +211,7 @@ seed = args.seed
 num_layers = args.nlayers
 word_emb_size = args.word_emsize
 data_path = args.data_file
-save_path = args.save_path
+reload_path = args.reload_path
 lr = args.lr
 clip = args.clip
 log_period = args.log_period
@@ -223,4 +224,4 @@ if torch.cuda.is_available():
 
 device = torch.device("cuda" if args.cuda else "cpu")
 
-run(args, device)
+run(args, device, reload_path)
