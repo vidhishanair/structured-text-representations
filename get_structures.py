@@ -107,6 +107,9 @@ def extract_structures(model, test_batches, device, vocab, dirName):
         if not value:
             continue
         output, sent_attention_matrix, doc_attention_matrix = model.forward(feed_dict)
+        batch_size = doc_attention_matrix.size(0)
+        sent_size = doc_attention_matrix.size(1)
+        token_size = sent_attention_matrix.size(1)
 
         for i in range(len(batch)):
             fileName = dirName+"/"+str(count)+".txt"
@@ -140,6 +143,12 @@ def extract_structures(model, test_batches, device, vocab, dirName):
 
             #doc_attention_matrix = doc_attention_matrix[:,:,1:]
             #print(doc_attention_matrix.size())
+
+            sentence_importance_vector = doc_attention_matrix[:,:,1:].sum(dim=1) * feed_dict['mask_sents']
+            sentence_importance_vector = doc_attention_matrix / doc_attention_matrix.sum(dim=1, keepdim=True).repeat(1, sentence_importance_vector.size(1))
+            token_level_sentence_scores = sentence_importance_vector.unsqueeze(1).repeat(1, token_size, 1).view(batch_size, sent_size*token_size)
+            doc_attention_matrix = doc_attention_matrix[:,:,1:]
+            print(token_level_sentence_scores)
             shape2 = doc_attention_matrix[i][0:l,0:l].size()
             row = torch.ones([1, shape2[1]+1]).to(device)
             column = torch.zeros([shape2[0], 1]).to(device)
