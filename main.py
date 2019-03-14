@@ -6,6 +6,7 @@ import torch
 import gc
 import argparse
 from models.DocumentClassificationModel import DocumentClassificationModel
+from models.DocumentClassificationModelCNN import DocumentClassificationModelCNN
 import tqdm
 import torch.optim as optim
 import torch
@@ -112,7 +113,10 @@ def run(config, device):
     # print(config.__flags)
     # logger.critical(str(config.__flags))
 
-    model = DocumentClassificationModel(device, config.n_embed, config.d_embed, config.dim_hidden, config.dim_hidden, 1, 1, config.dim_sem, pretrained=embedding_matrix, dropout=config.dropout, bidirectional=True).to(device)
+    if config.cnn:
+        model = DocumentClassificationModelCNN(device, config.n_embed, config.d_embed, config.dim_hidden, config.dim_hidden, 1, 1, config.dim_sem, pretrained=embedding_matrix, dropout=config.dropout, bidirectional=True).to(device)
+    else:
+        model = DocumentClassificationModel(device, config.n_embed, config.d_embed, config.dim_hidden, config.dim_hidden, 1, 1, config.dim_sem, pretrained=embedding_matrix, dropout=config.dropout, bidirectional=True).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adagrad(filter(lambda p: p.requires_grad, model.parameters()), lr=config.lr, weight_decay=1e-4)
 
@@ -192,6 +196,7 @@ parser.add_argument('--dropout', type=float, default=0.2,help='dropout applied t
 parser.add_argument('--clip', type=float, default=5,help='gradient clip')
 parser.add_argument('--log_period', type=float, default=500,help='log interval')
 parser.add_argument('--epochs', type=int, default=50,help='epochs')
+parser.add_argument('--cnn', action='store_true', default=False, help='flag for cnn encoder')
 
 args = parser.parse_args()
 cuda = args.cuda
