@@ -43,7 +43,7 @@ class CNNEncoder(nn.Module):
     def forward_packed(self, input, seq_len):
         # Sort by length (keep idx)
         batch_size, seq_len, dim = input.size()
-        input = input.transpose(0,2,1)
+        input = input.transpose(0,1).transpose(2,1)
         h_conv = self.conv1(input)
         h_relu = self.relu1(h_conv)
         h_max = self.maxpool1(h_relu)
