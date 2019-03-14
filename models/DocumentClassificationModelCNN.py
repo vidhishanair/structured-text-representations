@@ -7,7 +7,7 @@ from models.modules.StructuredAttention import StructuredAttention
 import itertools
 import time
 
-from modules.CNNEncoder import CNNEncoder
+from models.modules.CNNEncoder import CNNEncoder
 
 
 class DocumentClassificationModelCNN(nn.Module):
