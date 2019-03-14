@@ -14,6 +14,7 @@ class CNNEncoder(nn.Module):
         self.device = device
         filter_size = 5
         sequence_len = 30
+        self.strides = (1, 1)
         self.hidden_size = hidden_size
 
         self.conv1 = nn.Conv2d(in_channels=input_size,
