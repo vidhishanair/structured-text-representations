@@ -46,10 +46,8 @@ class CNNEncoder(nn.Module):
         input = input.transpose(1,2)
         h_conv = self.conv1(input.unsqueeze(-1))
         h_relu = self.relu1(h_conv)
-        print(h_relu.size())
-        h_max = self.maxpool1(h_relu)
-        print(h_max.size())
-        h_flat = h_max.view(-1, self.hidden_size)
-        h_flat = h_flat.view(batch_size, seq_len, self.hidden_size)
+        #h_max = self.maxpool1(h_relu)
+        #h_flat = h_relu.view(-1, self.hidden_size)
+        h_flat = h_relu.transpose(1,2)
         return h_flat, None
 

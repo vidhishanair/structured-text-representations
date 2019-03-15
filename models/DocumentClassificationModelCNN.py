@@ -73,26 +73,27 @@ class DocumentClassificationModelCNN(nn.Module):
         encoded_sentences, hidden = self.sentence_encoder.forward_packed(input, sent_l)
 
         mask = tokens_mask.view(tokens_mask.size(0)*tokens_mask.size(1), tokens_mask.size(2)).unsqueeze(2).repeat(1,1,encoded_sentences.size(2))
-        encoded_sentences = encoded_sentences * mask
+        encoded_sentences = encoded_sentences # * mask
 
+        encoded_sentences1 = encoded_sentences.squeeze()
         #Structure ATT
-        encoded_sentences, sent_attention_matrix = self.sentence_structure_att.forward(encoded_sentences)
+        encoded_sentences, sent_attention_matrix = self.sentence_structure_att.forward(encoded_sentences1)
 
         #Reshape and max pool
-        encoded_sentences = encoded_sentences.contiguous().view(batch_size, sent_size, token_size, encoded_sentences.size(2))
-        encoded_sentences = encoded_sentences + ((tokens_mask-1)*999).unsqueeze(3).repeat(1,1,1,encoded_sentences.size(3))
+        encoded_sentences = encoded_sentences.contiguous().view(batch_size, sent_size, encoded_sentences1.size(1), encoded_sentences.size(2))
+        encoded_sentences = encoded_sentences #+ ((tokens_mask-1)*999).unsqueeze(3).repeat(1,1,1,encoded_sentences.size(3))
         encoded_sentences = encoded_sentences.max(dim=2)[0] # Batch * sent * dim
 
         #Doc BiLSTM
-        encoded_documents, hidden = self.document_encoder.forward(encoded_sentences, doc_l)
+        encoded_documents, hidden = self.document_encoder.forward_packed(encoded_sentences, doc_l)
         mask = sent_mask.unsqueeze(2).repeat(1,1,encoded_documents.size(2))
-        encoded_documents = encoded_documents * mask
-
+        encoded_documents = encoded_documents #* mask
+        encoded_documents = encoded_documents.squeeze()
         #structure Att
         encoded_documents, doc_attention_matrix = self.document_structure_att.forward(encoded_documents)
 
         #Max Pool
-        encoded_documents = encoded_documents + ((sent_mask-1)*999).unsqueeze(2).repeat(1,1,encoded_documents.size(2))
+        encoded_documents = encoded_documents #+ ((sent_mask-1)*999).unsqueeze(2).repeat(1,1,encoded_documents.size(2))
         encoded_documents = encoded_documents.max(dim=1)[0]
 
         #encoded_documents = self.drop(encoded_documents)
