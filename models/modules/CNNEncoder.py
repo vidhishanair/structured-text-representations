@@ -24,7 +24,7 @@ class CNNEncoder(nn.Module):
                                bias=True)
         self.relu1 = nn.ReLU()
         pooling_window_size = sequence_len - filter_size + 1
-        self.maxpool1 = nn.MaxPool3d(kernel_size=(1, pooling_window_size, 1, 1), stride=(1, 1, 1, 1))
+        self.maxpool1 = nn.MaxPool3d(kernel_size=(1, pooling_window_size, 1), stride=(1, 1, 1))
 
 
     def forward(self, input, seq_len):
@@ -44,7 +44,7 @@ class CNNEncoder(nn.Module):
         # Sort by length (keep idx)
         batch_size, seq_len, dim = input.size()
         input = input.transpose(0,1).transpose(2,1)
-        h_conv = self.conv1(input)
+        h_conv = self.conv1(input.unsqueeze(-1))
         h_relu = self.relu1(h_conv)
         h_max = self.maxpool1(h_relu)
         h_flat = h_max.view(-1, self.hidden_size)
