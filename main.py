@@ -40,6 +40,10 @@ def get_feed_dict(batch, device):
         doc_l_matrix[i] = n_sents if n_sents>0 else 1
     max_doc_l = np.max(doc_l_matrix)
     max_sent_l = max([max([len(sent) for sent in doc.token_idxs]) for doc in batch])
+
+    max_doc_l = 30
+    max_sent_l = 30
+
     token_idxs_matrix = np.zeros([batch_size, max_doc_l, max_sent_l], np.int32)
     sent_l_matrix = np.ones([batch_size, max_doc_l], np.int32)
     gold_matrix = np.zeros([batch_size], np.int32)
