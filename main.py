@@ -21,7 +21,7 @@ def load_data(config):
     train, dev, test, embeddings, vocab = pickle.load(open(config.data_file, 'rb'))
     trainset, devset, testset = DataSet(train), DataSet(dev), DataSet(test)
     vocab = dict([(v['index'],k) for k,v in vocab.items()])
-    trainset.sort(reverse=False)
+    trainset.sort(reverse=True)
     train_batches = trainset.get_batches(config.batch_size, config.epochs, rand=False)
     dev_batches = devset.get_batches(config.batch_size, 1, rand=False)
     test_batches = testset.get_batches(config.batch_size, 1, rand=False)
@@ -37,9 +37,11 @@ def get_feed_dict(batch, device):
     doc_l_matrix = np.ones([batch_size], np.int32)
     for i, instance in enumerate(batch):
         n_sents = len(instance.token_idxs)
+        #print(instance.token_idxs)
         doc_l_matrix[i] = n_sents if n_sents>0 else 1
-    max_doc_l = np.max(doc_l_matrix)
-    max_sent_l = max([max([len(sent) for sent in doc.token_idxs]) for doc in batch])
+        doc_l_matrix[i] = doc_l_matrix[i] if doc_l_matrix[i] <= 30 else 30
+    max_doc_l2 = np.max(doc_l_matrix)
+    max_sent_l2 = max([max([len(sent) for sent in doc.token_idxs]) for doc in batch])
 
     max_doc_l = 30
     max_sent_l = 30
@@ -65,7 +67,7 @@ def get_feed_dict(batch, device):
     mask_parser_2 = np.ones([batch_size, max_doc_l, max_doc_l], np.float32)
     mask_parser_1[:, :, 0] = 0
     mask_parser_2[:, 0, :] = 0
-    if max_doc_l == 1 or max_sent_l == 1 or max_doc_l >30 or max_sent_l>30:
+    if max_doc_l2 == 1 or max_sent_l2 == 1 or max_doc_l >30 or max_sent_l>30:
         return False, {}
     try:
         feed_dict = {'token_idxs': torch.LongTensor(token_idxs_matrix).to(device),
@@ -201,7 +203,9 @@ def run(config, device, dirName):
     best_val = 0
     try:
         for ct, batch in tqdm.tqdm(train_batches, total=num_steps):
-            if ct!= 0 and ct%config.log_period==0 :
+            #print(ct)
+            #print(count)
+            if count!=0 and  ct!= 0 and ct%config.log_period==0 :
                 #acc_test = evaluate(model, test_batches, device, criterion)
                 acc_dev = evaluate(model, dev_batches, device, criterion)
                 if acc_dev > best_val:

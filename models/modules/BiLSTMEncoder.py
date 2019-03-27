@@ -21,11 +21,10 @@ class BiLSTMEncoder(nn.Module):
         :param input: batch*document_size*sent_size*emb_size
         :return: batch*document_size*sent_size*hidden_dim
         """
-        # print(seq_len)
-        # pack = torch.nn.utils.rnn.pack_padded_sequence(input, seq_len, batch_first=True)
-        output, hidden = self.bilstm(input)
-        # output, unpacked_len = torch.nn.utils.rnn.pad_packed_sequence(output)
-
+        #print(input.size())
+        pack = torch.nn.utils.rnn.pack_padded_sequence(input, seq_len, batch_first=True, enforce_sorted=False)
+        output, hidden = self.bilstm(pack)
+        output, unpacked_len = torch.nn.utils.rnn.pad_packed_sequence(output, batch_first=True, total_length = 30)
         return output, hidden
 
     def forward_packed(self, input, seq_len):

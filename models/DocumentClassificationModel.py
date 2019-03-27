@@ -68,7 +68,7 @@ class DocumentClassificationModel(nn.Module):
 
 
         #BiLSTM
-        encoded_sentences, hidden = self.sentence_encoder.forward_packed(input, sent_l)
+        encoded_sentences, hidden = self.sentence_encoder.forward(input, sent_l)
 
         mask = tokens_mask.view(tokens_mask.size(0)*tokens_mask.size(1), tokens_mask.size(2)).unsqueeze(2).repeat(1,1,encoded_sentences.size(2))
         encoded_sentences = encoded_sentences * mask
