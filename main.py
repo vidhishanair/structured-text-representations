@@ -54,8 +54,13 @@ def get_feed_dict(batch, device):
     mask_sents_matrix = np.ones([batch_size, max_doc_l], np.float32)
     for i, instance in enumerate(batch):
         n_sents = len(instance.token_idxs)
+        if n_sents > max_doc_l:
+            instance.token_idxs = instance.token_idxs[:max_doc_l]
+            n_sents = len(instance.token_idxs)
         gold_matrix[i] = instance.goldLabel
         for j, sent in enumerate(instance.token_idxs):
+            if len(sent) > max_sent_l:
+                sent = sent[:max_sent_l]
             token_idxs_matrix[i, j, :len(sent)] = np.asarray(sent)
             mask_tokens_matrix[i, j, len(sent):] = 0
             sent_l_matrix[i, j] = len(sent) if len(sent)>0 else 1
