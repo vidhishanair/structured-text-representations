@@ -82,7 +82,7 @@ class DocumentClassificationModel(nn.Module):
         encoded_sentences = encoded_sentences.max(dim=2)[0] # Batch * sent * dim
 
         #Doc BiLSTM
-        encoded_documents, hidden = self.document_encoder.forward(encoded_sentences, doc_l)
+        encoded_documents, hidden = self.document_encoder.forward_packed(encoded_sentences, doc_l)
         mask = sent_mask.unsqueeze(2).repeat(1,1,encoded_documents.size(2))
         encoded_documents = encoded_documents * mask
 

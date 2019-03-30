@@ -37,9 +37,16 @@ def get_feed_dict(batch, device):
     doc_l_matrix = np.ones([batch_size], np.int32)
     for i, instance in enumerate(batch):
         n_sents = len(instance.token_idxs)
+        #print(instance.token_idxs)
         doc_l_matrix[i] = n_sents if n_sents>0 else 1
+        doc_l_matrix[i] = doc_l_matrix[i] if doc_l_matrix[i] <= 30 else 30
     max_doc_l = np.max(doc_l_matrix)
-    max_sent_l = max([max([len(sent) for sent in doc.token_idxs]) for doc in batch])
+    max_sent_l = max([max([len(sent) for sent in doc.token_idxs][:max_doc_l]) for doc in batch])
+    #print([[len(sent) for sent in doc.token_idxs] for doc in batch])
+    #print([max([len(sent) for sent in doc.token_idxs]) for doc in batch])
+    #max_doc_l = 30
+    max_sent_l = max_sent_l if max_sent_l <= 30 else 30
+
     token_idxs_matrix = np.zeros([batch_size, max_doc_l, max_sent_l], np.int32)
     sent_l_matrix = np.ones([batch_size, max_doc_l], np.int32)
     gold_matrix = np.zeros([batch_size], np.int32)
