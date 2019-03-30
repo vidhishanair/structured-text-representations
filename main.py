@@ -40,11 +40,12 @@ def get_feed_dict(batch, device):
         #print(instance.token_idxs)
         doc_l_matrix[i] = n_sents if n_sents>0 else 1
         doc_l_matrix[i] = doc_l_matrix[i] if doc_l_matrix[i] <= 30 else 30
-    max_doc_l2 = np.max(doc_l_matrix)
-    max_sent_l2 = max([max([len(sent) for sent in doc.token_idxs]) for doc in batch])
-
-    max_doc_l = 30
-    max_sent_l = 30
+    max_doc_l = np.max(doc_l_matrix)
+    max_sent_l = max([max([len(sent) for sent in doc.token_idxs][:max_doc_l]) for doc in batch])
+    #print([[len(sent) for sent in doc.token_idxs] for doc in batch])
+    #print([max([len(sent) for sent in doc.token_idxs]) for doc in batch])
+    #max_doc_l = 30
+    max_sent_l = max_sent_l if max_sent_l <= 30 else 30
 
     token_idxs_matrix = np.zeros([batch_size, max_doc_l, max_sent_l], np.int32)
     sent_l_matrix = np.ones([batch_size, max_doc_l], np.int32)
@@ -58,16 +59,21 @@ def get_feed_dict(batch, device):
             n_sents = len(instance.token_idxs)
         gold_matrix[i] = instance.goldLabel
         for j, sent in enumerate(instance.token_idxs):
-            sent = sent[:max_sent_l]
+            #print(len(sent), max_sent_l)
+            if len(sent) > max_sent_l:
+                sent = sent[:max_sent_l]
             token_idxs_matrix[i, j, :len(sent)] = np.asarray(sent)
             mask_tokens_matrix[i, j, len(sent):] = 0
             sent_l_matrix[i, j] = len(sent) if len(sent)>0 else 1
+            #print(sent_l_matrix[i,j])
         mask_sents_matrix[i, n_sents:] = 0
     mask_parser_1 = np.ones([batch_size, max_doc_l, max_doc_l], np.float32)
     mask_parser_2 = np.ones([batch_size, max_doc_l, max_doc_l], np.float32)
     mask_parser_1[:, :, 0] = 0
     mask_parser_2[:, 0, :] = 0
-    if max_doc_l2 == 1 or max_sent_l2 == 1 or max_doc_l >30 or max_sent_l>30:
+    #print(max_doc_l)
+    #print(max_sent_l)
+    if max_doc_l == 1 or max_sent_l == 1 or max_doc_l >30 or max_sent_l>30:
         return False, {}
     try:
         feed_dict = {'token_idxs': torch.LongTensor(token_idxs_matrix).to(device),
@@ -231,7 +237,7 @@ def run(config, device, dirName):
             output, sent_attention_matrix, doc_attention_matrix = model.forward(feed_dict)
             target = feed_dict['gold_labels']
             loss = criterion(output, target)
-
+            #print(loss)
             optimizer.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm(model.parameters(), config.clip)

@@ -68,9 +68,12 @@ class DocumentClassificationModel(nn.Module):
 
 
         #BiLSTM
-        encoded_sentences, hidden = self.sentence_encoder.forward(input, sent_l)
+        #print(sent_l)
+        encoded_sentences, hidden = self.sentence_encoder.forward_packed(input, sent_l)
 
         mask = tokens_mask.view(tokens_mask.size(0)*tokens_mask.size(1), tokens_mask.size(2)).unsqueeze(2).repeat(1,1,encoded_sentences.size(2))
+        #print(encoded_sentences.size())
+        #print(mask.size())
         encoded_sentences = encoded_sentences * mask
 
         #Structure ATT
@@ -82,7 +85,7 @@ class DocumentClassificationModel(nn.Module):
         encoded_sentences = encoded_sentences.max(dim=2)[0] # Batch * sent * dim
 
         #Doc BiLSTM
-        encoded_documents, hidden = self.document_encoder.forward(encoded_sentences, doc_l)
+        encoded_documents, hidden = self.document_encoder.forward_packed(encoded_sentences, doc_l)
         mask = sent_mask.unsqueeze(2).repeat(1,1,encoded_documents.size(2))
         encoded_documents = encoded_documents * mask
 
