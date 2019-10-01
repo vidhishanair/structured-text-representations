@@ -29,24 +29,39 @@ class BiLSTMEncoder(nn.Module):
         return output, hidden
 
     def forward_packed(self, input, seq_len):
+        bs, ntokens, dim = input.size()
         # Sort by length (keep idx)
-        seq_len = np.array(seq_len)
-        sent_len, idx_sort = np.sort(seq_len)[::-1], np.argsort(-seq_len)
-        idx_unsort = np.argsort(idx_sort)
+        
+       # seq_len = np.array(seq_len)
+       # sent_len, idx_sort = np.sort(seq_len)[::-1], np.argsort(-seq_len)
+       # idx_unsort = np.argsort(idx_sort)
 
-        idx_sort = torch.from_numpy(idx_sort).to(self.device)
-        sent_variable = input.index_select(0, idx_sort)
+       # idx_sort = torch.from_numpy(idx_sort).to(self.device)
+       # sent_variable = input.index_select(0, idx_sort)
 
         # Handling padding in Recurrent Networks
-        #print(seq_len)
+        #print(len(seq_len))
         #print(sent_len)
-        sent_packed = nn.utils.rnn.pack_padded_sequence(sent_variable, sent_len.copy(), batch_first=True)
+        #print(input.size())
+        #print(seq_len.size())
+        #exit()
+        sent_packed = nn.utils.rnn.pack_padded_sequence(input, seq_len, batch_first=True, enforce_sorted=False)
         sent_output, hidden = self.bilstm(sent_packed)
-        sent_output = nn.utils.rnn.pad_packed_sequence(sent_output, batch_first=True)[0]
-
+        sent_output, _ = nn.utils.rnn.pad_packed_sequence(sent_output, batch_first=True)
+        
+        #if sent_output.size(1) < ntokens:
+        #    zeros = sent_output.new_zeros(bs,
+        #                            ntokens - sent_output.size(1),
+        #                            sent_output.size(2))
+        #    sent_output = torch.cat([sent_output, zeros], 1) 
+        
+        
+        
         # Un-sort by length
-        idx_unsort = torch.from_numpy(idx_unsort).to(self.device)
-        sent_output = sent_output.index_select(0, idx_unsort)
+        
+        #idx_unsort = torch.from_numpy(idx_unsort).to(self.device)
+        #sent_output = sent_output.index_select(0, idx_unsort)
 
-        del idx_sort, idx_unsort
+        #del idx_sort, idx_unsort
+        
         return sent_output, hidden

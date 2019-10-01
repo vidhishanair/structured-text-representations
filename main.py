@@ -22,6 +22,7 @@ def load_data(config):
     trainset, devset, testset = DataSet(train), DataSet(dev), DataSet(test)
     vocab = dict([(v['index'],k) for k,v in vocab.items()])
     trainset.sort(reverse=False)
+    #trainset.shuffle()
     train_batches = trainset.get_batches(config.batch_size, config.epochs, rand=False)
     dev_batches = devset.get_batches(config.batch_size, 1, rand=False)
     test_batches = testset.get_batches(config.batch_size, 1, rand=False)
@@ -45,7 +46,11 @@ def get_feed_dict(batch, device):
     #print([[len(sent) for sent in doc.token_idxs] for doc in batch])
     #print([max([len(sent) for sent in doc.token_idxs]) for doc in batch])
     #max_doc_l = 30
-    max_sent_l = max_sent_l if max_sent_l <= 30 else 30
+    sent_l = 15 if max_doc_l >= 15 else 25
+    max_sent_l = max_sent_l if max_sent_l <= sent_l else sent_l
+    #max_doc_l = max_doc_l if max_doc_l <= 20 else 20
+    #max_sent_l = 30
+    #max_doc_l = 30
 
     token_idxs_matrix = np.zeros([batch_size, max_doc_l, max_sent_l], np.int32)
     sent_l_matrix = np.ones([batch_size, max_doc_l], np.int32)
@@ -69,21 +74,22 @@ def get_feed_dict(batch, device):
     mask_parser_2 = np.ones([batch_size, max_doc_l, max_doc_l], np.float32)
     mask_parser_1[:, :, 0] = 0
     mask_parser_2[:, 0, :] = 0
-    if max_doc_l == 1 or max_sent_l == 1 or max_doc_l >30 or max_sent_l>30:
-        return False, {}
-    try:
-        feed_dict = {'token_idxs': torch.LongTensor(token_idxs_matrix).to(device),
+    #if False:# max_doc_l == 1 or max_sent_l == 1 or max_doc_l >30 or max_sent_l>30:
+    #    return False, {}
+    #try:
+    feed_dict = {'token_idxs': torch.LongTensor(token_idxs_matrix).to(device),
                  'gold_labels': torch.LongTensor(gold_matrix).to(device),
                  'mask_tokens': torch.FloatTensor(mask_tokens_matrix).to(device),
                  'mask_sents': torch.FloatTensor(mask_sents_matrix).to(device),
                  'sent_l': sent_l_matrix,
                  'doc_l': doc_l_matrix}
-    except:
-        return False, [batch_size * max_doc_l * max_sent_l * max_sent_l / (16 * 200000) + 1]
+    #except:
+    #    return False, [batch_size * max_doc_l * max_sent_l * max_sent_l / (16 * 200000) + 1]
     return True, feed_dict
 
 
 def evaluate(model, test_batches, device, criterion):
+    print("Starting Evaluation")
     corr_count, all_count = 0, 0
     model.eval()
     count = 0
@@ -191,9 +197,13 @@ def run(config, device, dirName):
     print(config)
 
     if config.cnn:
-        model = DocumentClassificationModelCNN(device, config.n_embed, config.d_embed, config.dim_hidden, config.dim_hidden, 1, 1, config.dim_sem, pretrained=embedding_matrix, dropout=config.dropout, bidirectional=True, py_version=config.pytorch_version).to(device)
+        model = DocumentClassificationModelCNN(device, config.n_embed, config.d_embed, config.dim_hidden, config.dim_hidden, 1, 1, config.dim_sem, pretrained=embedding_matrix, dropout=config.dropout, bidirectional=True, py_version=config.pytorch_version)
     else:
-        model = DocumentClassificationModel(device, config.n_embed, config.d_embed, config.dim_hidden, config.dim_hidden, 1, 1, config.dim_sem, pretrained=embedding_matrix, dropout=config.dropout, bidirectional=True, py_version=config.pytorch_version).to(device)
+        model = DocumentClassificationModel(device, config.n_embed, config.d_embed, config.dim_hidden, config.dim_hidden, 1, 1, config.dim_sem, pretrained=embedding_matrix, dropout=config.dropout, bidirectional=True, py_version=config.pytorch_version)
+    if config.data_parallel:
+        model = nn.DataParallel(model).to(device)
+    else:
+        model = model.to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adagrad(filter(lambda p: p.requires_grad, model.parameters()), lr=config.lr, weight_decay=0.01)
 
@@ -225,13 +235,15 @@ def run(config, device, dirName):
             model.train()
             torch.cuda.empty_cache()
             value, feed_dict = get_feed_dict(batch, device) # batch = [Instances], feed_dict = {inputs}
+            #print(value)
             if not value:
                 continue
             count += 1
+            #print("here")
             output, sent_attention_matrix, doc_attention_matrix = model.forward(feed_dict)
             target = feed_dict['gold_labels']
             loss = criterion(output, target)
-
+            #print(loss)
             optimizer.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm(model.parameters(), config.clip)
@@ -272,6 +284,7 @@ parser = argparse.ArgumentParser(description='PyTorch Structured Attention Model
 parser.add_argument('--cuda', action='store_true', default=False, help='use CUDA')
 parser.add_argument('--seed', type=int, default=1,help='random seed')
 parser.add_argument('--batch_size', type=int, default=8,help='batchsize')
+parser.add_argument('--data_parallel', action='store_true', default=False, help='flag to use nn.DataParallel')
 parser.add_argument('--lr', type=float, default=0.05,help='learning rate')
 parser.add_argument('--pytorch_version', type=str, default='nightly',help='location of the data corpus')
 parser.add_argument('--data_file', type=str, default='data/yelp-2013/yelp-2013-all.pkl',help='location of the data corpus')

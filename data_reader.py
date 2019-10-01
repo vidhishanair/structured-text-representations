@@ -49,6 +49,9 @@ class DataSet:
         self.data = sorted(self.data, key=lambda x: x._max_sent_len(), reverse=reverse)
         self.data = sorted(self.data, key=lambda x: x._doc_len(), reverse=reverse)
 
+    def shuffle(self):
+        random.shuffle(self.data)
+
     def get_by_idxs(self, idxs):
         return [self.data[idx] for idx in idxs]
 

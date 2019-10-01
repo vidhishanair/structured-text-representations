@@ -61,7 +61,7 @@ class DocumentClassificationModel(nn.Module):
 
         input = self.word_lookup(input['token_idxs'])
         input = self.drop(input)
-
+        #print("Input ", input.size())
         #reshape to 3D tensor
         input = input.contiguous().view(input.size(0)*input.size(1), input.size(2), input.size(3))
         sent_l = list(itertools.chain.from_iterable(sent_l))
@@ -84,6 +84,8 @@ class DocumentClassificationModel(nn.Module):
         #Doc BiLSTM
         encoded_documents, hidden = self.document_encoder.forward_packed(encoded_sentences, doc_l)
         mask = sent_mask.unsqueeze(2).repeat(1,1,encoded_documents.size(2))
+        #print("doc ", encoded_documents.size())
+        #print("mask ", mask.size())
         encoded_documents = encoded_documents * mask
 
         #structure Att
